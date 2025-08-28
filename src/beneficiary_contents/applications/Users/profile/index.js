@@ -11,28 +11,58 @@ import PersonalDetails from './PersonalDetails';
 import RSBSAStatus from './RSBSAStatus';
 import ApplicationHistory from './ApplicationHistory';
 import QuickActions from './QuickActions';
-import BeneficiarySummary from './BeneficiarySummary';
 
 function ManagementUserProfile() {
   const storedUser = JSON.parse(localStorage.getItem('user')) || {};
-  
-  // Get verification status from localStorage or default to not verified
   const profileData = JSON.parse(localStorage.getItem(`personal_details_${storedUser.id}`)) || {};
+
+  // Verification
   const isVerified = profileData.is_profile_verified || false;
-  const rsbsaNumber = profileData.system_generated_rsbsa_number || profileData.manual_rsbsa_number;
-  
+  const rsbsaNumber =
+    profileData.system_generated_rsbsa_number || profileData.manual_rsbsa_number;
+
+  // Build full name with middle initial + extension
+  const fullName = [
+    profileData.fname || storedUser.fname,
+    profileData.mname ? profileData.mname.charAt(0) + '.' : '',
+    profileData.lname || storedUser.lname,
+    profileData.extension_name || ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
   const user = {
-    savedCards: storedUser.savedCards || 0,
-    name: storedUser.name || storedUser.username || storedUser.email || 'Unknown User',
+    // Remove the bold duplicate name
+    name: '',
+    email: storedUser.email || 'No email available',
     coverImg: '/static/images/placeholders/covers/5.jpg',
     avatar: '/static/images/avatars/4.jpg',
-    description: isVerified 
-      ? `Verified RSBSA beneficiary${rsbsaNumber ? ` - ${rsbsaNumber}` : ''}. Access agricultural programs and services through your dashboard.`
-      : 'RSBSA registration not yet verified. Complete your profile and submit required documents to access agricultural programs.',
-    jobtitle: isVerified ? 'Verified RSBSA Beneficiary' : 'Pending RSBSA Verification',
-    location: profileData.municipality && profileData.province 
-      ? `${profileData.municipality}, ${profileData.province}` 
-      : storedUser.location || 'Opol, Misamis Oriental',
+    description: (
+      <div style={{ fontSize: '16px', lineHeight: '1.6', color: '#333333' }}>
+        <div style={{ fontSize: '18px', marginBottom: '8px', color: '#1a1a1a' }}>
+          <strong>Full Name:</strong> {fullName}
+        </div>
+        <div style={{ fontSize: '16px', marginBottom: '8px', color: '#1a1a1a' }}>
+          <strong>Email:</strong> {storedUser.email}
+        </div>
+        <div style={{ fontSize: '16px', color: '#1a1a1a' }}>
+          <strong>Status:</strong>{' '}
+          {isVerified ? (
+            <>
+              Verified {rsbsaNumber && `(RSBSA No: ${rsbsaNumber})`}
+            </>
+          ) : (
+            'Pending RSBSA Verification'
+          )}
+        </div>
+      </div>
+    ),
+    jobtitle: isVerified ? 'Verified RSBSA Beneficiary' : 'Pending Verification',
+    location:
+      profileData.municipality && profileData.province
+        ? `${profileData.municipality}, ${profileData.province}`
+        : storedUser.location || 'Opol, Misamis Oriental',
     followers: isVerified ? 'Verified' : 'Unverified'
   };
 
@@ -40,9 +70,9 @@ function ManagementUserProfile() {
     <>
       <Helmet>
         <title>User Profile - Beneficiary Details Management</title>
-        <meta 
-          name="description" 
-          content="Manage your personal details and beneficiary profile information" 
+        <meta
+          name="description"
+          content="Manage your personal details and beneficiary profile information"
         />
       </Helmet>
       <Container sx={{ mt: 3 }} maxWidth="lg">
@@ -54,18 +84,15 @@ function ManagementUserProfile() {
           spacing={3}
         >
           {/* Profile Cover Section */}
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12}>
             <ProfileCover user={user} />
           </Grid>
-          <Grid item xs={12} md={4}>
-            <BeneficiarySummary />
-          </Grid>
-          
-          {/* Personal Details Section - Primary Focus */}
+
+          {/* Personal Details Section */}
           <Grid item xs={12}>
             <PersonalDetails />
           </Grid>
-          
+
           {/* RSBSA Status and Quick Actions */}
           <Grid item xs={12} md={8}>
             <RSBSAStatus />
@@ -73,7 +100,7 @@ function ManagementUserProfile() {
           <Grid item xs={12} md={4}>
             <QuickActions />
           </Grid>
-          
+
           {/* Application History and Address Information */}
           <Grid item xs={12} md={7}>
             <ApplicationHistory />

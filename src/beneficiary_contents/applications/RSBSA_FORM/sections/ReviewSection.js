@@ -22,7 +22,6 @@ import {
   Person as PersonIcon,
   Agriculture as AgricultureIcon,
   Landscape as LandscapeIcon,
-  Work as WorkIcon,
   Edit as EditIcon,
   ExpandMore as ExpandMoreIcon,
   CheckCircle as CheckCircleIcon,
@@ -165,7 +164,7 @@ const ReviewSection = ({ formData, errors, onEdit }) => {
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <AgricultureIcon sx={{ mr: 2 }} />
                   <Typography variant="h6" fontWeight="bold">
-                    Farm Profile
+                    Farm Profile & Livelihood Details
                   </Typography>
                 </Box>
                 <Button
@@ -180,110 +179,13 @@ const ReviewSection = ({ formData, errors, onEdit }) => {
               </Box>
             </AccordionSummary>
             <AccordionDetails>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Primary Livelihood Category ID:</strong> {formData.farmProfile.livelihood_category_id || 'Not selected'}
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
-        </Grid>
-
-        {/* Farm Parcels Review */}
-        <Grid item xs={12}>
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: 'warning.light', color: 'warning.contrastText' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mr: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <LandscapeIcon sx={{ mr: 2 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    Farm Parcels ({formData.farmParcels.length})
-                  </Typography>
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<EditIcon />}
-                  onClick={() => onEdit(3)}
-                  sx={{ color: 'inherit', borderColor: 'currentColor' }}
-                >
-                  Edit
-                </Button>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
-              {formData.farmParcels.length === 0 ? (
-                <Typography variant="body2" color="error">
-                  No farm parcels added. At least one parcel is required.
-                </Typography>
-              ) : (
-                <Grid container spacing={2}>
-                  {formData.farmParcels.map((parcel, index) => (
-                    <Grid item xs={12} key={index}>
-                      <Card variant="outlined" sx={{ p: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Parcel #{index + 1} {parcel.parcel_number && `- ${parcel.parcel_number}`}
-                        </Typography>
-                        <Grid container spacing={1}>
-                          <Grid item xs={12} md={4}>
-                            <Typography variant="body2" color="text.secondary">
-                              <strong>Location:</strong> {parcel.barangay || 'Not specified'}
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} md={4}>
-                            <Typography variant="body2" color="text.secondary">
-                              <strong>Area:</strong> {parcel.farm_area || 0} hectares
-                            </Typography>
-                          </Grid>
-                          <Grid item xs={12} md={4}>
-                            <Typography variant="body2" color="text.secondary">
-                              <strong>Tenure:</strong> {formatEnum(parcel.tenure_type)}
-                            </Typography>
-                          </Grid>
-                        </Grid>
-                        {(parcel.is_ancestral_domain || parcel.is_agrarian_reform_beneficiary || parcel.is_organic_practitioner) && (
-                          <Box sx={{ mt: 1 }}>
-                            {parcel.is_ancestral_domain && <Chip label="Ancestral Domain" size="small" sx={{ mr: 1 }} />}
-                            {parcel.is_agrarian_reform_beneficiary && <Chip label="Agrarian Reform" size="small" sx={{ mr: 1 }} />}
-                            {parcel.is_organic_practitioner && <Chip label="Organic" size="small" />}
-                          </Box>
-                        )}
-                      </Card>
-                    </Grid>
-                  ))}
-                  <Grid item xs={12}>
-                    <Typography variant="body2" color="primary" fontWeight="bold">
-                      Total Area: {formData.farmParcels.reduce((sum, parcel) => sum + (parcel.farm_area || 0), 0).toFixed(2)} hectares
-                    </Typography>
-                  </Grid>
-                </Grid>
-              )}
-            </AccordionDetails>
-          </Accordion>
-        </Grid>
-
-        {/* Livelihood Details Review */}
-        <Grid item xs={12}>
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: 'info.light', color: 'info.contrastText' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mr: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <WorkIcon sx={{ mr: 2 }} />
-                  <Typography variant="h6" fontWeight="bold">
-                    Livelihood Details
-                  </Typography>
-                </Box>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<EditIcon />}
-                  onClick={() => onEdit(4)}
-                  sx={{ color: 'inherit', borderColor: 'currentColor' }}
-                >
-                  Edit
-                </Button>
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails>
               <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    <strong>Primary Livelihood Category ID:</strong> {formData.farmProfile.livelihood_category_id || 'Not selected'}
+                  </Typography>
+                </Grid>
+
                 {/* Farmer Details */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" gutterBottom color="primary">
@@ -362,6 +264,79 @@ const ReviewSection = ({ formData, errors, onEdit }) => {
                   </List>
                 </Grid>
               </Grid>
+            </AccordionDetails>
+          </Accordion>
+        </Grid>
+
+        {/* Farm Parcels Review */}
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ backgroundColor: 'warning.light', color: 'warning.contrastText' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mr: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <LandscapeIcon sx={{ mr: 2 }} />
+                  <Typography variant="h6" fontWeight="bold">
+                    Farm Parcels ({formData.farmParcels.length})
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<EditIcon />}
+                  onClick={() => onEdit(3)}
+                  sx={{ color: 'inherit', borderColor: 'currentColor' }}
+                >
+                  Edit
+                </Button>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              {formData.farmParcels.length === 0 ? (
+                <Typography variant="body2" color="error">
+                  No farm parcels added. At least one parcel is required.
+                </Typography>
+              ) : (
+                <Grid container spacing={2}>
+                  {formData.farmParcels.map((parcel, index) => (
+                    <Grid item xs={12} key={index}>
+                      <Card variant="outlined" sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Parcel #{index + 1} {parcel.parcel_number && `- ${parcel.parcel_number}`}
+                        </Typography>
+                        <Grid container spacing={1}>
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Location:</strong> {parcel.barangay || 'Not specified'}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Area:</strong> {parcel.farm_area || 0} hectares
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} md={4}>
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Tenure:</strong> {formatEnum(parcel.tenure_type)}
+                            </Typography>
+                          </Grid>
+                        </Grid>
+                        {(parcel.is_ancestral_domain || parcel.is_agrarian_reform_beneficiary || parcel.is_organic_practitioner) && (
+                          <Box sx={{ mt: 1 }}>
+                            {parcel.is_ancestral_domain && <Chip label="Ancestral Domain" size="small" sx={{ mr: 1 }} />}
+                            {parcel.is_agrarian_reform_beneficiary && <Chip label="Agrarian Reform" size="small" sx={{ mr: 1 }} />}
+                            {parcel.is_organic_practitioner && <Chip label="Organic" size="small" />}
+                          </Box>
+                        )}
+                      </Card>
+                    </Grid>
+                  ))}
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="primary" fontWeight="bold">
+                      Total Area: {formData.farmParcels.reduce((sum, parcel) => sum + (parcel.farm_area || 0), 0).toFixed(2)} hectares
+                    </Typography>
+                  </Grid>
+                </Grid>
+              )}
             </AccordionDetails>
           </Accordion>
         </Grid>

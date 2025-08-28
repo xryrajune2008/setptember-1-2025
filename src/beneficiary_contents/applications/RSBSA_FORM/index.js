@@ -16,14 +16,12 @@ import {
   Fade,
   Paper,
   Chip,
-
   Tooltip
 } from '@mui/material';
 import {
   Person as PersonIcon,
   Agriculture as AgricultureIcon,
   Landscape as LandscapeIcon,
-  Work as WorkIcon,
   Assessment as AssessmentIcon,
   Send as SendIcon,
   ArrowBack as ArrowBackIcon,
@@ -36,11 +34,10 @@ import { styled } from '@mui/material/styles';
 // Import the custom hook
 import { useRSBSAForm } from './useRSBSAForm';
 
-// Import form sections (we'll create these)
+// Import form sections
 import BeneficiaryProfileSection from './sections/BeneficiaryProfileSection';
 import FarmProfileSection from './sections/FarmProfileSection';
 import FarmParcelsSection from './sections/FarmParcelsSection';
-import LivelihoodDetailsSection from './sections/LivelihoodDetailsSection';
 import ReviewSection from './sections/ReviewSection';
 import SubmissionSection from './sections/SubmissionSection';
 
@@ -101,7 +98,6 @@ const RSBSAForm = () => {
   const {
     formData,
     errors,
-
     isSubmitting,
     currentStep,
     totalSteps,
@@ -109,14 +105,12 @@ const RSBSAForm = () => {
     addFarmParcel,
     updateFarmParcel,
     removeFarmParcel,
-
     nextStep,
     prevStep,
     goToStep,
     submitForm,
     resetForm,
     formProgress,
-
     canSubmit
   } = useRSBSAForm();
 
@@ -124,7 +118,7 @@ const RSBSAForm = () => {
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Step configuration
+  // Updated step configuration (removed livelihood details step)
   const steps = [
     {
       label: 'Personal Information',
@@ -140,11 +134,6 @@ const RSBSAForm = () => {
       label: 'Farm Parcels',
       icon: <LandscapeIcon />,
       description: 'Land ownership details'
-    },
-    {
-      label: 'Livelihood Details',
-      icon: <WorkIcon />,
-      description: 'Specific agricultural activities'
     },
     {
       label: 'Review',
@@ -203,8 +192,12 @@ const RSBSAForm = () => {
         return (
           <FarmProfileSection
             formData={formData.farmProfile}
+            farmerDetails={formData.farmerDetails}
+            fisherfolkDetails={formData.fisherfolkDetails}
+            farmworkerDetails={formData.farmworkerDetails}
+            agriYouthDetails={formData.agriYouthDetails}
             errors={errors}
-            updateField={(field, value) => updateField('farmProfile', field, value)}
+            updateField={updateField}
           />
         );
       case 3:
@@ -219,24 +212,13 @@ const RSBSAForm = () => {
         );
       case 4:
         return (
-          <LivelihoodDetailsSection
-            farmerDetails={formData.farmerDetails}
-            fisherfolkDetails={formData.fisherfolkDetails}
-            farmworkerDetails={formData.farmworkerDetails}
-            agriYouthDetails={formData.agriYouthDetails}
-            errors={errors}
-            updateField={updateField}
-          />
-        );
-      case 5:
-        return (
           <ReviewSection
             formData={formData}
             errors={errors}
             onEdit={goToStep}
           />
         );
-      case 6:
+      case 5:
         return (
           <SubmissionSection
             formData={formData}
