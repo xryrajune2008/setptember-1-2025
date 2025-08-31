@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 /* eslint-disable no-restricted-globals */
 /* eslint-disable no-useless-escape */
 import axiosInstance from './axiosInstance';

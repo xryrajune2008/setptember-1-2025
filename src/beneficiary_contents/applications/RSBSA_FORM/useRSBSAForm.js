@@ -1,5 +1,7 @@
+/* eslint-disable no-else-return */
+/* eslint-disable no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
-import { rsbsaFormService, referenceDataService } from '../../api/rsbsaService';
+import { rsbsaFormService, referenceDataService } from '../../../api/rsbsaService';
 
 /**
  * Custom hook for managing RSBSA form state and operations
@@ -198,16 +200,17 @@ export const useRSBSAForm = () => {
         setExistingEnrollment(result.data);
         
         // Populate form data with existing enrollment
-        setFormData(prevData => ({
-          ...prevData,
-          beneficiaryDetails: { ...prevData.beneficiaryDetails, ...result.data.beneficiaryDetails },
-          farmProfile: { ...prevData.farmProfile, ...result.data.farmProfile },
-          farmParcels: result.data.farmParcels || [],
-          farmerDetails: { ...prevData.farmerDetails, ...result.data.livelihoodDetails },
-          fisherfolkDetails: { ...prevData.fisherfolkDetails, ...result.data.livelihoodDetails },
-          farmworkerDetails: { ...prevData.farmworkerDetails, ...result.data.livelihoodDetails },
-          agriYouthDetails: { ...prevData.agriYouthDetails, ...result.data.livelihoodDetails }
-        }));
+          setFormData(prevData => ({
+            ...prevData,
+            beneficiaryDetails: { ...prevData.beneficiaryDetails, ...result.data.beneficiaryDetails },
+            farmProfile: { ...prevData.farmProfile, ...result.data.farmProfile },
+            farmParcels: result.data.farmParcels || [],
+            farmerActivities: { ...prevData.farmerActivities, ...result.data.livelihoodDetails },
+            fisherfolkActivities: { ...prevData.fisherfolkActivities, ...result.data.livelihoodDetails },
+            farmworkerActivities: { ...prevData.farmworkerActivities, ...result.data.livelihoodDetails },
+            agriYouthActivities: { ...prevData.agriYouthActivities, ...result.data.livelihoodDetails }
+          }));
+
         
         localStorage.setItem('rsbsa_form_data', JSON.stringify(formData));
       } else {
@@ -647,60 +650,72 @@ export const useRSBSAForm = () => {
 
   // Get form completion percentage with enhanced calculation
   const getFormProgress = useCallback(() => {
-    const totalFields = 20; // Updated number of required fields
-    let completedFields = 0;
+  const totalFields = 20; // Updated number of required fields
+  let completedFields = 0;
 
-    try {
-      // Check beneficiary details completion
-      const { beneficiaryDetails } = formData;
-      if (beneficiaryDetails.first_name?.trim()) completedFields++;
-      if (beneficiaryDetails.last_name?.trim()) completedFields++;
-      if (beneficiaryDetails.barangay?.trim()) completedFields++;
-      if (beneficiaryDetails.municipality?.trim()) completedFields++;
-      if (beneficiaryDetails.province?.trim()) completedFields++;
-      if (beneficiaryDetails.region?.trim()) completedFields++;
-      if (beneficiaryDetails.contact_number?.trim()) completedFields++;
+  try {
+    // Check beneficiary details completion
+    const { beneficiaryDetails } = formData;
+    if (beneficiaryDetails.barangay?.trim()) completedFields++;
+    if (beneficiaryDetails.municipality?.trim()) completedFields++;
+    if (beneficiaryDetails.province?.trim()) completedFields++;
+    if (beneficiaryDetails.region?.trim()) completedFields++;
+    if (beneficiaryDetails.contact_number?.trim()) completedFields++;
+    if (beneficiaryDetails.birth_date) completedFields++;
+    if (beneficiaryDetails.sex) completedFields++;
+    if (beneficiaryDetails.civil_status) completedFields++;
 
-      // Check farm profile completion
-      if (formData.farmProfile.livelihood_category_id) completedFields++;
+    // Check farm profile completion
+    if (formData.farmProfile.livelihood_category_id) completedFields++;
 
-      // Check farm parcels completion
-      if (formData.farmParcels.length > 0) {
-        completedFields++;
-        // Check if first parcel is properly filled
-        const firstParcel = formData.farmParcels[0];
-        if (firstParcel && firstParcel.barangay && firstParcel.tenure_type && firstParcel.farm_area > 0) {
-          completedFields += 3;
-        }
+    // Check farm parcels completion
+    if (formData.farmParcels.length > 0) {
+      completedFields++;
+      // Check if first parcel is properly filled
+      const firstParcel = formData.farmParcels[0];
+      if (firstParcel && firstParcel.barangay && firstParcel.tenure_type && firstParcel.farm_area > 0) {
+        completedFields += 3;
       }
-
-      // Check livelihood-specific completion
-      const livelihoodCategoryId = formData.farmProfile.livelihood_category_id;
-      if (livelihoodCategoryId === 1) { // Farmer
-        const hasActivity = formData.farmerDetails.is_rice || formData.farmerDetails.is_corn || 
-                           formData.farmerDetails.is_other_crops || formData.farmerDetails.is_livestock || 
-                           formData.farmerDetails.is_poultry;
-        if (hasActivity) completedFields++;
-      } else if (livelihoodCategoryId === 2) { // Fisherfolk
-        const hasActivity = formData.fisherfolkDetails.is_fish_capture || 
-                           formData.fisherfolkDetails.is_aquaculture || 
-                           formData.fisherfolkDetails.is_fish_processing;
-        if (hasActivity) completedFields++;
-      } else if (livelihoodCategoryId === 3) { // Farmworker
-        const hasActivity = formData.farmworkerDetails.is_land_preparation || 
-                           formData.farmworkerDetails.is_cultivation || 
-                           formData.farmworkerDetails.is_harvesting;
-        if (hasActivity) completedFields++;
-      } else if (livelihoodCategoryId === 4) { // Agri Youth
-        if (formData.agriYouthDetails.is_agri_youth) completedFields++;
-      }
-
-      return Math.round((completedFields / totalFields) * 100);
-    } catch (error) {
-      console.error('❌ Error calculating form progress:', error);
-      return 0;
     }
-  }, [formData]);
+
+    // Check livelihood-specific completion based on NEW STRUCTURE
+    const livelihoodCategoryId = formData.farmProfile.livelihood_category_id;
+    
+    if (livelihoodCategoryId === 1) { // Farmer
+      const hasActivity = formData.farmerActivities?.rice || 
+                         formData.farmerActivities?.corn || 
+                         formData.farmerActivities?.other_crops || 
+                         formData.farmerActivities?.livestock || 
+                         formData.farmerActivities?.poultry;
+      if (hasActivity) completedFields++;
+    } else if (livelihoodCategoryId === 2) { // Fisherfolk
+      const hasActivity = formData.fisherfolkActivities?.fish_capture || 
+                         formData.fisherfolkActivities?.aquaculture || 
+                         formData.fisherfolkActivities?.gleaning ||
+                         formData.fisherfolkActivities?.fish_processing ||
+                         formData.fisherfolkActivities?.fish_vending;
+      if (hasActivity) completedFields++;
+    } else if (livelihoodCategoryId === 3) { // Farmworker
+      const hasActivity = formData.farmworkerActivities?.land_preparation || 
+                         formData.farmworkerActivities?.planting ||
+                         formData.farmworkerActivities?.cultivation || 
+                         formData.farmworkerActivities?.harvesting;
+      if (hasActivity) completedFields++;
+    } else if (livelihoodCategoryId === 4) { // Agri Youth
+      if (formData.agriYouthActivities?.is_agri_youth) completedFields++;
+    }
+
+    // Check beneficiary livelihoods (new structure)
+    if (formData.beneficiaryLivelihoods && formData.beneficiaryLivelihoods.length > 0) {
+      completedFields++;
+    }
+
+    return Math.round((completedFields / totalFields) * 100);
+  } catch (error) {
+    console.error('❌ Error calculating form progress:', error);
+    return 0;
+  }
+}, [formData]);
 
   return {
     // State

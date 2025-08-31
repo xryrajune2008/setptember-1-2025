@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -127,7 +128,7 @@ const RSBSAForm = () => {
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Handle form submission with proper backend integration
+  // ✅ Single handleSubmit
   const handleSubmit = async () => {
     try {
       const result = await submitForm(userId);
@@ -145,12 +146,11 @@ const RSBSAForm = () => {
     }
   };
 
-  // Handle draft saving
+  // ✅ Single handleSaveDraft
   const handleSaveDraft = async () => {
     try {
       const result = await saveDraft(userId);
       if (result.success) {
-        // Show temporary success message for draft saving
         console.log('✅ Draft saved successfully');
       } else {
         console.error('❌ Failed to save draft:', result.error);
@@ -160,7 +160,17 @@ const RSBSAForm = () => {
     }
   };
 
-  // Updated step configuration (removed livelihood details step)
+  // Handle form reset
+  const handleReset = () => {
+    // eslint-disable-next-line no-alert
+    if (window.confirm('Are you sure you want to reset the form? All data will be lost.')) {
+      resetForm();
+      setShowSuccess(false);
+      setShowError(false);
+    }
+  };
+
+  // Step configuration
   const steps = [
     {
       label: 'Personal Information',
@@ -188,36 +198,6 @@ const RSBSAForm = () => {
       description: 'Submit your application'
     }
   ];
-
-  // Handle form submission
-  const handleSubmit = async () => {
-    const success = await submitForm();
-    if (success) {
-      setShowSuccess(true);
-      setShowError(false);
-    } else {
-      setShowError(true);
-      setErrorMessage('Failed to submit form. Please try again.');
-      setShowSuccess(false);
-    }
-  };
-
-  // Handle form reset
-  const handleReset = () => {
-    // eslint-disable-next-line no-alert
-    if (window.confirm('Are you sure you want to reset the form? All data will be lost.')) {
-      resetForm();
-      setShowSuccess(false);
-      setShowError(false);
-    }
-  };
-
-  // Save draft
-  const handleSaveDraft = () => {
-    // Data is automatically saved to localStorage via the hook
-    // eslint-disable-next-line no-alert
-    alert('Draft saved successfully!');
-  };
 
   // Render current step content
   const renderStepContent = () => {

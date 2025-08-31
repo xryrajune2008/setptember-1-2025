@@ -398,11 +398,14 @@ const PersonalDetails = () => {
             <AccordionDetails>
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
-                  <DatePicker
+                 <DatePicker
                     label="Birth Date *"
                     value={formData.birth_date ? new Date(formData.birth_date) : null}
-                    onChange={(date) => updateField('birth_date', date?.toISOString().split('T')[0])}
+                    onChange={(date) =>
+                      updateField('birth_date', date ? date.toISOString().split('T')[0] : null)
+                    }
                     disabled={!isEditing}
+                    maxDate={new Date()} // 🚀 prevent future dates
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -413,6 +416,7 @@ const PersonalDetails = () => {
                       />
                     )}
                   />
+
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <TextField
