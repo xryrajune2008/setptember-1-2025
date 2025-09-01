@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
+import { beneficiaryDetailsService } from '../../api/rsbsaService';
 
 const useLoginBeneficiary = () => {
   const [formData, setFormData] = useState({ username: '', password: '', rememberMe: false });
@@ -56,6 +57,42 @@ const useLoginBeneficiary = () => {
     }
   }, []);
 
+  // Fetch beneficiary details and RSBSA information
+  const fetchBeneficiaryDetails = useCallback(async (userId) => {
+    try {
+      console.log('🔍 Fetching beneficiary details for user:', userId);
+      const result = await beneficiaryDetailsService.getDetailsByUserId(userId);
+      
+      if (result.success && result.data) {
+        const beneficiaryDetails = result.data;
+        
+        // Store beneficiary ID and RSBSA information
+        localStorage.setItem('beneficiaryId', beneficiaryDetails.id);
+        localStorage.setItem('beneficiaryDetails', JSON.stringify(beneficiaryDetails));
+        
+        // Store RSBSA numbers if available
+        if (beneficiaryDetails.system_generated_rsbsa_number) {
+          localStorage.setItem('rsbsaNumber', beneficiaryDetails.system_generated_rsbsa_number);
+        } else if (beneficiaryDetails.manual_rsbsa_number) {
+          localStorage.setItem('rsbsaNumber', beneficiaryDetails.manual_rsbsa_number);
+        }
+        
+        console.log('✅ Beneficiary details stored:', {
+          beneficiaryId: beneficiaryDetails.id,
+          rsbsaNumber: beneficiaryDetails.system_generated_rsbsa_number || beneficiaryDetails.manual_rsbsa_number
+        });
+        
+        return beneficiaryDetails;
+      }
+      
+      console.warn('⚠️ No beneficiary details found for user:', userId);
+      return null;
+    } catch (err) {
+      console.error('❌ Error fetching beneficiary details:', err);
+      return null;
+    }
+  }, []);
+
   const handleLogin = useCallback(async () => {
     setError('');
     setSuccess('');
@@ -76,6 +113,10 @@ const useLoginBeneficiary = () => {
       }
 
       storeAuth(token, user);
+      
+      // Fetch beneficiary details after successful login
+      await fetchBeneficiaryDetails(user.id);
+      
       setSuccess('Login successful! Redirecting...');
 
       setTimeout(() => {
@@ -88,7 +129,7 @@ const useLoginBeneficiary = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [formData, storeAuth, navigate]);
+  }, [formData, storeAuth, navigate, fetchBeneficiaryDetails]);
 
   return {
     formData,

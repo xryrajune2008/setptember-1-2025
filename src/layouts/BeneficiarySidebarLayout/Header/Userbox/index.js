@@ -92,6 +92,11 @@ const handleSignOut = () => {
   localStorage.removeItem('user');
   localStorage.removeItem('authToken');
   localStorage.removeItem('userData');
+  
+  // Clear beneficiary-specific data
+  localStorage.removeItem('beneficiaryId');
+  localStorage.removeItem('rsbsaNumber');
+  localStorage.removeItem('beneficiaryDetails');
 
   // Clear all sessionStorage authentication data
   sessionStorage.removeItem('token');

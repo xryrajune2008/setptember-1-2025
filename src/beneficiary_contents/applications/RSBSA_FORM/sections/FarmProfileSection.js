@@ -1,625 +1,543 @@
-/* eslint-disable no-unused-vars */
-/* eslint-disable react/button-has-type */
-import React, { useState, useEffect } from 'react';
+// eslint-disable-next-line no-unused-vars
+// eslint-disable-next-line react/button-has-type
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { referenceDataService } from '../../../../api/rsbsaService';
 import {
   Grid,
   FormControlLabel,
-  Switch,
+  Checkbox,
   Typography,
   Box,
   Card,
   CardContent,
-  Divider,
   Alert,
   Tabs,
   Tab,
-  Chip
+  TextField,
+  Paper,
+  Chip,
+  Divider
 } from '@mui/material';
 import {
   Agriculture as AgricultureIcon,
   CheckCircle as CheckCircleIcon,
-  Person as PersonIcon,
   Work as WorkIcon,
   WaterDrop as WaterDropIcon,
   School as SchoolIcon
 } from '@mui/icons-material';
 
+// Activity configurations to reduce repetitive code
+const ACTIVITY_CONFIGS = {
+  1: { // Farmer
+    section: 'farmerActivities',
+    title: 'Farmer Activities',
+    subtitle: 'Tell us about your farming activities and specializations',
+    color: 'success',
+    icon: AgricultureIcon,
+    fields: {
+      crops: {
+        title: 'What crops do you grow?',
+        chipLabel: 'Crop Production',
+        items: [
+          { key: 'rice', label: 'Rice', description: 'Cultivating rice varieties' },
+          { key: 'corn', label: 'Corn', description: 'Growing corn/maize crops' },
+          { 
+            key: 'other_crops', 
+            label: 'Other Crops', 
+            description: 'Specialty or other crops',
+            hasSpecify: true,
+            specifyKey: 'other_crops_specify',
+            specifyLabel: 'Specify Other Crops',
+            specifyPlaceholder: 'e.g., Coffee, Cacao, Sugarcane, etc.'
+          }
+        ]
+      },
+      animals: {
+        title: 'Do you raise livestock or poultry?',
+        chipLabel: 'Animal Production',
+        chipColor: 'info',
+        items: [
+          { 
+            key: 'livestock', 
+            label: 'Livestock', 
+            description: 'Cattle, goats, swine, carabao',
+            hasSpecify: true,
+            specifyKey: 'livestock_specify',
+            specifyLabel: 'Specify Livestock Types',
+            specifyPlaceholder: 'e.g., Cattle, Goat, Swine, Carabao, etc.'
+          },
+          { 
+            key: 'poultry', 
+            label: 'Poultry', 
+            description: 'Chickens, ducks, geese',
+            hasSpecify: true,
+            specifyKey: 'poultry_specify',
+            specifyLabel: 'Specify Poultry Types',
+            specifyPlaceholder: 'e.g., Chicken, Duck, Goose, Turkey, etc.'
+          }
+        ]
+      }
+    }
+  },
+  2: { // Farm Worker
+    section: 'farmworkerActivities',
+    title: 'Farmworker Activities',
+    subtitle: 'Tell us about your farm work specializations',
+    color: 'info',
+    icon: WorkIcon,
+    fields: {
+      services: {
+        title: 'What farm work do you specialize in?',
+        chipLabel: 'Farm Services',
+        items: [
+          { key: 'land_preparation', label: 'Land Preparation', description: 'Plowing, tilling, soil preparation' },
+          { key: 'planting', label: 'Planting', description: 'Seed/seedling planting' },
+          { key: 'cultivation', label: 'Cultivation', description: 'Weeding, fertilizing, crop maintenance' },
+          { key: 'harvesting', label: 'Harvesting', description: 'Crop gathering and post-harvest' },
+          { 
+            key: 'others', 
+            label: 'Others', 
+            description: 'Other farm work activities',
+            hasSpecify: true,
+            specifyKey: 'others_specify',
+            specifyLabel: 'Specify Other Farm Work Activities',
+            specifyPlaceholder: 'e.g., Pest Control, Post-harvest Processing, etc.'
+          }
+        ]
+      }
+    }
+  },
+  3: { // Fisherfolk
+    section: 'fisherfolkActivities',
+    title: 'Fisherfolk Activities',
+    subtitle: 'Tell us about your fishing and aquaculture activities',
+    color: 'primary',
+    icon: WaterDropIcon,
+    fields: {
+      fishing: {
+        title: 'What fishing activities are you involved in?',
+        chipLabel: 'Fishing & Aquaculture',
+        items: [
+          { key: 'fish_capture', label: 'Fish Capture', description: 'Ocean, river, lake fishing' },
+          { key: 'aquaculture', label: 'Aquaculture', description: 'Fish farming, pond culture' },
+          { key: 'seaweed_farming', label: 'Seaweed Farming', description: 'Marine algae cultivation' },
+          { key: 'gleaning', label: 'Gleaning', description: 'Collecting shellfish, seaweed' },
+          { key: 'fish_processing', label: 'Fish Processing', description: 'Drying, smoking, packaging' }
+        ]
+      }
+    }
+  },
+  4: { // Agri-Youth
+    section: 'agriYouthActivities',
+    title: 'Agri-Youth Activities',
+    subtitle: 'Tell us about your agricultural youth involvement',
+    color: 'warning',
+    icon: SchoolIcon,
+    fields: {
+      youth: {
+        title: 'Are you an Agri-Youth?',
+        chipLabel: 'Youth Development',
+        items: [
+          { key: 'is_agri_youth', label: 'I am an Agri-Youth (18-30 years old)', description: 'Youth involved in agriculture' }
+        ]
+      },
+      additional: {
+        title: 'Additional Information',
+        conditional: 'is_agri_youth',
+        items: [
+          { key: 'is_part_of_farming_household', label: 'Part of Farming Household', description: 'Member of a farming family' },
+          { key: 'is_formal_agri_course', label: 'Formal Agricultural Course', description: 'Enrolled in formal agricultural education' },
+          { key: 'is_nonformal_agri_course', label: 'Non-formal Agricultural Training', description: 'Workshops, seminars, training programs' },
+          { key: 'is_agri_program_participant', label: 'Agricultural Program Participant', description: 'Government or NGO agricultural programs' }
+        ]
+      }
+    }
+  }
+};
+
 const FarmProfileSection = ({ formData, errors, updateField }) => {
   const [selectedTab, setSelectedTab] = useState(0);
+  const [livelihoodCategories, setLivelihoodCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize livelihood categories locally
-  const livelihoodCategories = [
-    { id: 1, category_name: 'Farmer', icon: <AgricultureIcon /> },
-    { id: 2, category_name: 'Farmworker', icon: <WorkIcon /> },
-    { id: 3, category_name: 'Fisherfolk', icon: <WaterDropIcon /> },
-    { id: 4, category_name: 'Agri-Youth', icon: <SchoolIcon /> }
-  ];
+  // Default categories fallback
+  const defaultCategories = useMemo(() => [
+    { id: 1, category_name: 'Farmer', description: 'Crop cultivation and livestock raising' },
+    { id: 2, category_name: 'Farm Worker', description: 'Agricultural labor and farm services' },
+    { id: 3, category_name: 'Fisherfolk', description: 'Fishing and aquaculture activities' },
+    { id: 4, category_name: 'Agri-Youth', description: 'Young agricultural practitioners' }
+  ], []);
 
-  // Initialize form data structure if not exists
+  // Enhanced categories with icons and colors
+  const enhancedCategories = useMemo(() => {
+    const categories = livelihoodCategories.length > 0 ? livelihoodCategories : defaultCategories;
+    return categories.map(category => {
+      const config = ACTIVITY_CONFIGS[category.id];
+      return {
+        ...category,
+        icon: config?.icon || AgricultureIcon,
+        color: config?.color || 'primary'
+      };
+    });
+  }, [livelihoodCategories, defaultCategories]);
+
+  // Fetch livelihood categories
   useEffect(() => {
-    if (!formData.farmProfile) {
-      updateField('farmProfile', 'livelihood_category_id', null);
-    }
-    if (!formData.farmerActivities) {
-      updateField('farmerActivities', {});
-    }
-    if (!formData.farmworkerActivities) {
-      updateField('farmworkerActivities', {});
-    }
-    if (!formData.fisherfolkActivities) {
-      updateField('fisherfolkActivities', {});
-    }
-    if (!formData.agriYouthActivities) {
-      updateField('agriYouthActivities', {});
-    }
-  }, []);
+    let isMounted = true;
 
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
-    setSelectedTab(newValue);
-    const categoryId = livelihoodCategories[newValue].id;
-    updateField('farmProfile', 'livelihood_category_id', categoryId);
-
-    // 🔥 Console log tab switch
-    console.log(
-      `Switched to tab: ${livelihoodCategories[newValue].category_name} (index: ${newValue}, id: ${categoryId})`
-    );
-  };
-
-  // Helper function to get category name by ID
-  const getCategoryName = (categoryId) => {
-    const category = livelihoodCategories.find((cat) => cat.id === categoryId);
-    return category ? category.category_name : '';
-  };
-
-  // SwitchField component
-  const SwitchField = ({ label, description, checked, onChange }) => {
-    const handleChange = (e) => {
-      onChange(e);
-      // 🔥 Console log toggle change
-      console.log(`Toggled "${label}" → ${!checked}`);
+    const fetchCategories = async () => {
+      try {
+        const result = await referenceDataService.getLivelihoodCategories();
+        if (isMounted && result.success && result.data) {
+          const categoriesArray = Array.isArray(result.data) ? result.data : Object.values(result.data);
+          setLivelihoodCategories(categoriesArray);
+        }
+      } catch (error) {
+        console.error('Failed to fetch livelihood categories:', error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
     };
 
-    return (
-      <Card
-        variant="outlined"
-        sx={{
-          p: 3,
-          background: checked
-            ? 'linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%)'
-            : 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
-          border: checked ? '2px solid #4caf50' : '1px solid rgba(0,0,0,0.12)',
-          borderRadius: 2,
-          cursor: 'pointer',
-          transition: 'all 0.3s ease'
-        }}
-        onClick={handleChange}
-      >
+    fetchCategories();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Initialize form data
+  useEffect(() => {
+    if (!formData || isLoading) return;
+
+    const initializeData = () => {
+      // Initialize farmProfile
+      if (!formData.farmProfile?.livelihood_category_id && enhancedCategories.length > 0) {
+        updateField('farmProfile', 'livelihood_category_id', enhancedCategories[0].id);
+      }
+
+      // Initialize activity sections based on configs
+      Object.values(ACTIVITY_CONFIGS).forEach(config => {
+        if (!formData[config.section]) {
+          // Initialize all fields for this section
+          Object.values(config.fields).forEach(fieldGroup => {
+            fieldGroup.items.forEach(item => {
+              updateField(config.section, item.key, false);
+              if (item.hasSpecify && item.specifyKey) {
+                updateField(config.section, item.specifyKey, '');
+              }
+            });
+          });
+        }
+      });
+    };
+
+    initializeData();
+  }, [formData, updateField, enhancedCategories, isLoading]);
+
+  // Sync selected tab with livelihood category
+  useEffect(() => {
+    if (enhancedCategories.length === 0) return;
+    
+    const currentId = formData?.farmProfile?.livelihood_category_id;
+    if (currentId) {
+      const index = enhancedCategories.findIndex(cat => cat.id === currentId);
+      if (index >= 0 && index !== selectedTab) {
+        setSelectedTab(index);
+      }
+    }
+  }, [formData?.farmProfile?.livelihood_category_id, enhancedCategories, selectedTab]);
+
+  // Memoized helper functions
+  const getActivityValue = useCallback((section, field, defaultValue = false) => {
+    return formData?.[section]?.[field] ?? defaultValue;
+  }, [formData]);
+
+  const handleTabChange = useCallback((event, newValue) => {
+    setSelectedTab(newValue);
+    const selectedCategory = enhancedCategories[newValue];
+    if (selectedCategory) {
+      updateField('farmProfile', 'livelihood_category_id', selectedCategory.id);
+    }
+  }, [enhancedCategories, updateField]);
+
+  const handleFieldChange = useCallback((section, field, value) => {
+    updateField(section, field, value);
+  }, [updateField]);
+
+  // Reusable CheckboxField component
+  const CheckboxField = React.memo(({ label, description, checked, onChange }) => (
+    <Card 
+      variant="outlined" 
+      sx={{ 
+        height: '100%',
+        border: checked ? '2px solid' : '1px solid',
+        borderColor: checked ? 'primary.main' : 'divider',
+        bgcolor: checked ? 'primary.50' : 'background.paper',
+        transition: 'all 0.2s ease',
+        '&:hover': {
+          borderColor: 'primary.main',
+          bgcolor: checked ? 'primary.50' : 'grey.50'
+        }
+      }}
+    >
+      <CardContent sx={{ p: 2.5 }}>
         <FormControlLabel
           control={
-            <Switch checked={checked} onChange={handleChange} color="primary" />
+            <Checkbox
+              checked={checked}
+              onChange={onChange}
+              color="primary"
+              size="medium"
+            />
           }
           label={
             <Box sx={{ ml: 1 }}>
-              <Typography variant="body1" fontWeight="600">
+              <Typography variant="subtitle1" fontWeight="600" color="text.primary">
                 {label}
               </Typography>
-              {description && (
-                <Typography variant="body2" color="text.secondary">
-                  {description}
-                </Typography>
-              )}
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {description}
+              </Typography>
             </Box>
           }
-          sx={{ m: 0, width: '100%', pointerEvents: 'none' }}
+          sx={{ 
+            width: '100%', 
+            alignItems: 'flex-start',
+            margin: 0
+          }}
         />
+      </CardContent>
+    </Card>
+  ));
+
+  // Generic field group renderer
+  const renderFieldGroup = useCallback((config, fieldGroupKey, fieldGroup) => {
+    const { section, color } = config;
+    const shouldShow = !fieldGroup.conditional || getActivityValue(section, fieldGroup.conditional);
+
+    if (!shouldShow) return null;
+
+    return (
+      <Card variant="outlined" key={fieldGroupKey} sx={{ mb: 3 }}>
+        <CardContent sx={{ p: 3 }}>
+          {fieldGroup.conditional && <Divider sx={{ mb: 3 }} />}
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <Chip 
+              label={fieldGroup.chipLabel || fieldGroup.title} 
+              color={fieldGroup.chipColor || color} 
+              variant="outlined" 
+              sx={{ mr: 2 }}
+            />
+            <Typography variant="h6" fontWeight="600">
+              {fieldGroup.title}
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3}>
+            {fieldGroup.items.map((item) => (
+              <Grid item xs={12} sm={6} md={fieldGroup.items.length > 4 ? 4 : 6} key={item.key}>
+                <CheckboxField
+                  label={item.label}
+                  description={item.description}
+                  checked={getActivityValue(section, item.key)}
+                  onChange={() => handleFieldChange(section, item.key, !getActivityValue(section, item.key))}
+                />
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Render specify fields */}
+          {fieldGroup.items.map((item) => {
+            if (!item.hasSpecify || !getActivityValue(section, item.key)) return null;
+            
+            return (
+              <Box key={item.specifyKey} sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <TextField
+                  fullWidth
+                  label={item.specifyLabel}
+                  placeholder={item.specifyPlaceholder}
+                  value={getActivityValue(section, item.specifyKey, '')}
+                  onChange={(e) => handleFieldChange(section, item.specifyKey, e.target.value)}
+                  helperText={`Please specify ${item.label.toLowerCase()}`}
+                  size="small"
+                />
+              </Box>
+            );
+          })}
+
+          {/* Special success message for Agri-Youth */}
+          {section === 'agriYouthActivities' && getActivityValue(section, 'is_agri_youth') && fieldGroupKey === 'additional' && (
+            <Alert severity="success" sx={{ mt: 3, borderRadius: 2 }}>
+              <CheckCircleIcon fontSize="small" sx={{ mr: 1 }} />
+              Welcome, Agri-Youth! 🌱 You're the future of agriculture.
+            </Alert>
+          )}
+        </CardContent>
       </Card>
     );
-  };
+  }, [getActivityValue, handleFieldChange]);
 
-  // Farmer Activities (Tab Index: 0)
-  const renderFarmerActivities = () => (
-    <Box>
-      <Typography
-        variant="h6"
-        fontWeight="600"
-        sx={{ mb: 3, color: 'primary.main' }}
-      >
-        What crops do you grow?
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Rice"
-            description="Cultivating rice varieties"
-            checked={formData.farmerActivities?.rice || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'rice',
-                !formData.farmerActivities?.rice
-              )
-            }
-          />
-        </Grid>
+  // Render content based on selected category
+  const renderTabContent = useCallback(() => {
+    const currentId = formData?.farmProfile?.livelihood_category_id;
+    const config = ACTIVITY_CONFIGS[currentId];
+    
+    if (!config) return null;
 
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Corn"
-            description="Growing corn/maize crops"
-            checked={formData.farmerActivities?.corn || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'corn',
-                !formData.farmerActivities?.corn
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Vegetables"
-            description="Leafy greens, root crops, etc."
-            checked={formData.farmerActivities?.vegetables || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'vegetables',
-                !formData.farmerActivities?.vegetables
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Fruits"
-            description="Fruit trees and bushes"
-            checked={formData.farmerActivities?.fruits || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'fruits',
-                !formData.farmerActivities?.fruits
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Coconut"
-            description="Coconut palm cultivation"
-            checked={formData.farmerActivities?.coconut || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'coconut',
-                !formData.farmerActivities?.coconut
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Other Crops"
-            description="Specialty or other crops"
-            checked={formData.farmerActivities?.other_crops || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'other_crops',
-                !formData.farmerActivities?.other_crops
-              )
-            }
-          />
-        </Grid>
-      </Grid>
+    const IconComponent = config.icon;
 
-      <Typography
-        variant="h6"
-        fontWeight="600"
-        sx={{ mb: 3, mt: 4, color: 'primary.main' }}
-      >
-        Do you raise livestock or poultry?
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Livestock"
-            description="Cattle, goats, swine, carabao"
-            checked={formData.farmerActivities?.livestock || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'livestock',
-                !formData.farmerActivities?.livestock
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Poultry"
-            description="Chickens, ducks, geese"
-            checked={formData.farmerActivities?.poultry || false}
-            onChange={() =>
-              updateField(
-                'farmerActivities',
-                'poultry',
-                !formData.farmerActivities?.poultry
-              )
-            }
-          />
-        </Grid>
-      </Grid>
-    </Box>
-  );
+    return (
+      <Box>
+        <Box sx={{ mb: 4, textAlign: 'center' }}>
+          <Box sx={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: 64, 
+            height: 64, 
+            bgcolor: `${config.color}.main`, 
+            borderRadius: '50%',
+            mb: 2
+          }}>
+            <IconComponent sx={{ fontSize: 32, color: 'white' }} />
+          </Box>
+          <Typography variant="h4" fontWeight="600" color={`${config.color}.main`} gutterBottom>
+            {config.title}
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            {config.subtitle}
+          </Typography>
+        </Box>
 
-  // Farmworker Activities (Tab Index: 1)
-  const renderFarmworkerActivities = () => (
-    <Box>
-      <Typography
-        variant="h6"
-        fontWeight="600"
-        sx={{ mb: 3, color: 'primary.main' }}
-      >
-        What farm work do you specialize in?
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Land Preparation"
-            description="Plowing, tilling, soil preparation"
-            checked={formData.farmworkerActivities?.land_preparation || false}
-            onChange={() =>
-              updateField(
-                'farmworkerActivities',
-                'land_preparation',
-                !formData.farmworkerActivities?.land_preparation
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Planting"
-            description="Seed/seedling planting"
-            checked={formData.farmworkerActivities?.planting || false}
-            onChange={() =>
-              updateField(
-                'farmworkerActivities',
-                'planting',
-                !formData.farmworkerActivities?.planting
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Cultivation & Care"
-            description="Weeding, fertilizing, crop maintenance"
-            checked={formData.farmworkerActivities?.cultivation || false}
-            onChange={() =>
-              updateField(
-                'farmworkerActivities',
-                'cultivation',
-                !formData.farmworkerActivities?.cultivation
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Harvesting"
-            description="Crop gathering and post-harvest"
-            checked={formData.farmworkerActivities?.harvesting || false}
-            onChange={() =>
-              updateField(
-                'farmworkerActivities',
-                'harvesting',
-                !formData.farmworkerActivities?.harvesting
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Irrigation"
-            description="Water management systems"
-            checked={formData.farmworkerActivities?.irrigation || false}
-            onChange={() =>
-              updateField(
-                'farmworkerActivities',
-                'irrigation',
-                !formData.farmworkerActivities?.irrigation
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Equipment Operation"
-            description="Operating farm machinery"
-            checked={formData.farmworkerActivities?.equipment_operation || false}
-            onChange={() =>
-              updateField(
-                'farmworkerActivities',
-                'equipment_operation',
-                !formData.farmworkerActivities?.equipment_operation
-              )
-            }
-          />
-        </Grid>
-      </Grid>
-    </Box>
-  );
-
-  // Fisherfolk Activities (Tab Index: 2)
-  const renderFisherfolkActivities = () => (
-    <Box>
-      <Typography
-        variant="h6"
-        fontWeight="600"
-        sx={{ mb: 3, color: 'primary.main' }}
-      >
-        What fishing activities are you involved in?
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Fish Capture"
-            description="Ocean, river, lake fishing"
-            checked={formData.fisherfolkActivities?.fish_capture || false}
-            onChange={() =>
-              updateField(
-                'fisherfolkActivities',
-                'fish_capture',
-                !formData.fisherfolkActivities?.fish_capture
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Aquaculture"
-            description="Fish farming, pond culture"
-            checked={formData.fisherfolkActivities?.aquaculture || false}
-            onChange={() =>
-              updateField(
-                'fisherfolkActivities',
-                'aquaculture',
-                !formData.fisherfolkActivities?.aquaculture
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <SwitchField
-            label="Seaweed Farming"
-            description="Marine algae cultivation"
-            checked={formData.fisherfolkActivities?.seaweed_farming || false}
-            onChange={() =>
-              updateField(
-                'fisherfolkActivities',
-                'seaweed_farming',
-                !formData.fisherfolkActivities?.seaweed_farming
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Gleaning"
-            description="Collecting shellfish, seaweed"
-            checked={formData.fisherfolkActivities?.gleaning || false}
-            onChange={() =>
-              updateField(
-                'fisherfolkActivities',
-                'gleaning',
-                !formData.fisherfolkActivities?.gleaning
-              )
-            }
-          />
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <SwitchField
-            label="Fish Processing"
-            description="Drying, smoking, packaging"
-            checked={formData.fisherfolkActivities?.fish_processing || false}
-            onChange={() =>
-              updateField(
-                'fisherfolkActivities',
-                'fish_processing',
-                !formData.fisherfolkActivities?.fish_processing
-              )
-            }
-          />
-        </Grid>
-      </Grid>
-    </Box>
-  );
-
-  // Agri-Youth Activities (Tab Index: 3)
-  const renderAgriYouthActivities = () => (
-    <Box>
-      <Typography
-        variant="h6"
-        fontWeight="600"
-        sx={{ mb: 3, color: 'primary.main' }}
-      >
-        Are you an Agri-Youth?
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <SwitchField
-            label="I am an Agri-Youth (18-30 years old)"
-            description="Youth involved in agriculture"
-            checked={formData.agriYouthActivities?.is_agri_youth || false}
-            onChange={() =>
-              updateField(
-                'agriYouthActivities',
-                'is_agri_youth',
-                !formData.agriYouthActivities?.is_agri_youth
-              )
-            }
-          />
-        </Grid>
-
-        {formData.agriYouthActivities?.is_agri_youth && (
-          <>
-            <Grid item xs={12}>
-              <Typography
-                variant="h6"
-                fontWeight="600"
-                sx={{ mb: 2, color: 'primary.main' }}
-              >
-                Additional Information
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <SwitchField
-                label="Part of Farming Household"
-                description="Member of a farming family"
-                checked={
-                  formData.agriYouthActivities?.is_part_of_farming_household ||
-                  false
-                }
-                onChange={() =>
-                  updateField(
-                    'agriYouthActivities',
-                    'is_part_of_farming_household',
-                    !formData.agriYouthActivities
-                      ?.is_part_of_farming_household
-                  )
-                }
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <SwitchField
-                label="Formal Agricultural Course"
-                description="Enrolled in formal agricultural education"
-                checked={
-                  formData.agriYouthActivities?.is_formal_agri_course || false
-                }
-                onChange={() =>
-                  updateField(
-                    'agriYouthActivities',
-                    'is_formal_agri_course',
-                    !formData.agriYouthActivities?.is_formal_agri_course
-                  )
-                }
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <SwitchField
-                label="Non-formal Agricultural Training"
-                description="Workshops, seminars, training programs"
-                checked={
-                  formData.agriYouthActivities?.is_nonformal_agri_course ||
-                  false
-                }
-                onChange={() =>
-                  updateField(
-                    'agriYouthActivities',
-                    'is_nonformal_agri_course',
-                    !formData.agriYouthActivities
-                      ?.is_nonformal_agri_course
-                  )
-                }
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <SwitchField
-                label="Agricultural Program Participant"
-                description="Government or NGO agricultural programs"
-                checked={
-                  formData.agriYouthActivities
-                    ?.is_agri_program_participant || false
-                }
-                onChange={() =>
-                  updateField(
-                    'agriYouthActivities',
-                    'is_agri_program_participant',
-                    !formData.agriYouthActivities
-                      ?.is_agri_program_participant
-                  )
-                }
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Alert severity="success" sx={{ mt: 2 }}>
-                <CheckCircleIcon fontSize="small" sx={{ mr: 1 }} />
-                Welcome, Agri-Youth! 🌱 You're the future of agriculture.
-              </Alert>
-            </Grid>
-          </>
+        {Object.entries(config.fields).map(([fieldGroupKey, fieldGroup]) =>
+          renderFieldGroup(config, fieldGroupKey, fieldGroup)
         )}
-      </Grid>
-    </Box>
-  );
+      </Box>
+    );
+  }, [formData?.farmProfile?.livelihood_category_id, renderFieldGroup]);
 
-  // Helper function to render content based on selected tab
-  const renderTabContent = () => {
-    switch (selectedTab) {
-      case 0:
-        return renderFarmerActivities();
-      case 1:
-        return renderFarmworkerActivities();
-      case 2:
-        return renderFisherfolkActivities();
-      case 3:
-        return renderAgriYouthActivities();
-      default:
-        return null;
-    }
-  };
+  // Safety check
+  if (!formData) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6" color="error">
+          Form data is not available. Please refresh the page.
+        </Typography>
+      </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6">Loading livelihood categories...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box>
       {/* Section Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-        <AgricultureIcon
-          sx={{ fontSize: 32, color: 'primary.main', mr: 2 }}
-        />
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          width: 48, 
+          height: 48, 
+          bgcolor: 'primary.main', 
+          borderRadius: '50%',
+          mr: 2
+        }}>
+          <AgricultureIcon sx={{ fontSize: 24, color: 'white' }} />
+        </Box>
         <Box>
-          <Typography
-            variant="h4"
-            component="h2"
-            fontWeight="bold"
-            color="primary"
-          >
+          <Typography variant="h4" component="h2" fontWeight="bold" color="primary">
             Farm Profile & Livelihood
           </Typography>
-         <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary">
             Select your primary livelihood category and tell us about your activities.
           </Typography>
         </Box>
       </Box>
 
-      {/* Livelihood Tabs */}
-      <Tabs
-        value={selectedTab}
-        onChange={handleTabChange}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{ mb: 4 }}
-      >
-        {livelihoodCategories.map((category, index) => (
-          <Tab
-            key={category.id}
-            icon={category.icon}
-            label={category.category_name}
-            wrapped
-          />
-        ))}
-      </Tabs>
+      {/* Current Selection Display */}
+      {formData.farmProfile?.livelihood_category_id && (
+        <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
+          <Typography variant="body2">
+            <strong>Selected:</strong> {enhancedCategories.find(cat => cat.id === formData.farmProfile.livelihood_category_id)?.category_name}
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Enhanced Livelihood Tabs */}
+      <Paper sx={{ mb: 4, borderRadius: 2, overflow: 'hidden' }}>
+        <Tabs
+          value={selectedTab}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            bgcolor: 'background.default',
+            '& .MuiTab-root': {
+              minHeight: 80,
+              textTransform: 'none',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              color: 'text.secondary',
+              '&.Mui-selected': {
+                color: 'primary.main',
+                fontWeight: 'bold'
+              }
+            },
+            '& .MuiTabs-indicator': {
+              height: 4,
+              borderRadius: 2
+            }
+          }}
+        >
+          {enhancedCategories.map((category, index) => {
+            const IconComponent = category.icon;
+            return (
+              <Tab
+                key={category.id}
+                icon={
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      width: 32, 
+                      height: 32, 
+                      bgcolor: selectedTab === index ? `${category.color}.main` : 'grey.300',
+                      borderRadius: '50%',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <IconComponent sx={{ fontSize: 18, color: 'white' }} />
+                    </Box>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="body2" fontWeight="inherit">
+                        {category.category_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                        {category.description}
+                      </Typography>
+                    </Box>
+                  </Box>
+                }
+                wrapped
+              />
+            );
+          })}
+        </Tabs>
+      </Paper>
 
       {/* Tab Content */}
-      <Card variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-        <CardContent>{renderTabContent()}</CardContent>
-      </Card>
+      <Box sx={{ minHeight: 400 }}>
+        {renderTabContent()}
+      </Box>
     </Box>
   );
 };

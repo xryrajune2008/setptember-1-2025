@@ -4,22 +4,23 @@
 /* eslint-disable no-useless-escape */
 import axiosInstance from './axiosInstance';
 
+
 // Add validation schemas
 const VALIDATION_SCHEMAS = {
   beneficiaryDetails: {
-    required: ['first_name', 'last_name', 'contact_number', 'barangay', 'municipality', 'province', 'region'],
-    string: ['first_name', 'last_name', 'middle_name', 'contact_number', 'barangay', 'municipality', 'province', 'region', 'address'],
+    required: ['contact_number', 'barangay', 'birth_date', 'sex'],
+    string: ['contact_number', 'barangay', 'municipality', 'province', 'region', 'place_of_birth', 'religion', 'mothers_maiden_name', 'household_head_name', 'emergency_contact_number'],
     email: ['email'],
-    phone: ['contact_number']
+    phone: ['contact_number', 'emergency_contact_number']
   },
   farmProfile: {
     required: ['livelihood_category_id'],
     integer: ['livelihood_category_id']
   },
   farmParcel: {
-    required: ['parcel_number', 'barangay', 'tenure_type', 'farm_type', 'farm_area'],
-    string: ['parcel_number', 'barangay', 'tenure_type', 'farm_type', 'remarks'],
-    decimal: ['farm_area'],
+    required: ['barangay', 'tenure_type', 'total_farm_area'],
+    string: ['parcel_number', 'barangay', 'tenure_type', 'farm_type', 'landowner_name', 'ownership_document_number', 'remarks'],
+    decimal: ['total_farm_area'],
     boolean: ['is_ancestral_domain', 'is_agrarian_reform_beneficiary', 'is_organic_practitioner']
   }
 };
@@ -29,7 +30,7 @@ const validateField = (value, fieldName, rules) => {
   const errors = [];
   
   if (rules.required && rules.required.includes(fieldName)) {
-    if (!value || (typeof value === 'string' && value.trim() === '')) {
+    if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
       errors.push(`${fieldName} is required`);
     }
   }
@@ -970,6 +971,9 @@ export const rsbsaFormService = {
     try {
       console.log('🚀 Submitting complete RSBSA form (NEW STRUCTURE):', { formData, userId });
       
+      // Debug: Log the complete form data structure
+      console.log('📋 Complete form data structure:', JSON.stringify(formData, null, 2));
+      
       // Validate complete form data
       const formValidation = this.validateCompleteForm(formData);
       if (formValidation.hasErrors) {
@@ -979,25 +983,112 @@ export const rsbsaFormService = {
         throw error;
       }
       
-      // Step 1: Create beneficiary details
-      const beneficiaryResult = await beneficiaryDetailsService.createDetails({
-        ...formData.beneficiaryDetails,
-        user_id: userId,
-        profile_completion_status: 'completed',
-        data_source: 'self_registration'
-      });
+      // Step 1: Check if beneficiary details already exist for this user
+      console.log('🔍 Checking for existing beneficiary details for user:', userId);
+      
+      let beneficiaryDetailsId;
+      let beneficiaryResult;
+      
+      try {
+        // Try to get existing beneficiary details
+        const existingBeneficiaryResult = await beneficiaryDetailsService.getDetailsByUserId(userId);
+        
+        if (existingBeneficiaryResult.success && existingBeneficiaryResult.data) {
+          console.log('✅ Found existing beneficiary details:', existingBeneficiaryResult.data);
+          beneficiaryDetailsId = existingBeneficiaryResult.data.id;
+          beneficiaryResult = existingBeneficiaryResult;
+        } else {
+          console.log('📝 No existing beneficiary details found, creating new one...');
+          
+          // Create new beneficiary details
+          beneficiaryResult = await beneficiaryDetailsService.createDetails({
+            ...formData.beneficiaryDetails,
+            user_id: userId,
+            profile_completion_status: 'completed',
+            data_source: 'self_registration'
+          });
 
-      if (!beneficiaryResult.success) {
-        return beneficiaryResult;
+          console.log('📋 Beneficiary creation result:', beneficiaryResult);
+
+          if (!beneficiaryResult.success) {
+            console.error('❌ Beneficiary creation failed:', beneficiaryResult);
+            return beneficiaryResult;
+          }
+
+          beneficiaryDetailsId = beneficiaryResult.data.id;
+        }
+      } catch (error) {
+        console.log('📝 Error getting existing beneficiary details, creating new one...');
+        
+        // Create new beneficiary details
+        beneficiaryResult = await beneficiaryDetailsService.createDetails({
+          ...formData.beneficiaryDetails,
+          user_id: userId,
+          profile_completion_status: 'completed',
+          data_source: 'self_registration'
+        });
+
+        console.log('📋 Beneficiary creation result:', beneficiaryResult);
+
+        if (!beneficiaryResult.success) {
+          console.error('❌ Beneficiary creation failed:', beneficiaryResult);
+          return beneficiaryResult;
+        }
+
+        beneficiaryDetailsId = beneficiaryResult.data.id;
+      }
+      console.log('📋 Beneficiary Details ID:', beneficiaryDetailsId);
+      console.log('📋 Beneficiary Result:', beneficiaryResult);
+      
+      // Validate that beneficiary ID is valid
+      if (!beneficiaryDetailsId) {
+        console.error('❌ Beneficiary ID is null or undefined!');
+        return {
+          success: false,
+          error: 'Beneficiary ID is invalid',
+          details: 'Failed to create beneficiary details properly'
+        };
       }
 
-      const beneficiaryDetailsId = beneficiaryResult.data.id;
-
       // Step 2: Create farm profile
-      const farmProfileResult = await farmProfileService.createProfile({
+      console.log('🚀 Creating farm profile with data:', {
         ...formData.farmProfile,
-        beneficiary_id: beneficiaryDetailsId
+        beneficiary_id: userId
       });
+      console.log('📋 Original farmProfile data:', formData.farmProfile);
+      console.log('📋 Beneficiary (user) ID:', userId);
+      
+      // Validate that livelihood category is selected
+      if (!formData.farmProfile.livelihood_category_id) {
+        console.error('❌ Livelihood category not selected!');
+        return {
+          success: false,
+          error: 'Livelihood category is required',
+          details: 'Please select a livelihood category before submitting'
+        };
+      }
+      
+      // Validate that at least one farm parcel exists
+      if (!formData.farmParcels || formData.farmParcels.length === 0) {
+        console.error('❌ No farm parcels added!');
+        return {
+          success: false,
+          error: 'Farm parcels are required',
+          details: 'Please add at least one farm parcel before submitting'
+        };
+      }
+      
+      const farmProfileData = {
+        ...formData.farmProfile,
+        beneficiary_id: userId
+      };
+      console.log('📋 Final farm profile data being sent:', farmProfileData);
+      console.log('📋 Original farmProfile:', formData.farmProfile);
+      console.log('📋 Beneficiary (user) ID being added:', userId);
+      console.log('📋 Spread result:', { ...formData.farmProfile });
+      console.log('📋 Final object:', { ...formData.farmProfile, beneficiary_id: userId });
+      
+      const farmProfileResult = await farmProfileService.createProfile(farmProfileData);
 
       if (!farmProfileResult.success) {
         return farmProfileResult;
@@ -1022,12 +1113,20 @@ export const rsbsaFormService = {
       // Step 4: NEW LIVELIHOOD SYSTEM - Create beneficiary livelihoods and activities
       const livelihoodResults = [];
       
+      // Convert single livelihood to beneficiaryLivelihoods array if needed (backward compatibility)
+      let livelihoodsToProcess = formData.beneficiaryLivelihoods;
+      if ((!livelihoodsToProcess || livelihoodsToProcess.length === 0) && formData.farmProfile.livelihood_category_id) {
+        livelihoodsToProcess = [{
+          livelihood_category_id: formData.farmProfile.livelihood_category_id
+        }];
+      }
+      
       // Handle multiple livelihoods if beneficiaryLivelihoods array exists
-      if (formData.beneficiaryLivelihoods && formData.beneficiaryLivelihoods.length > 0) {
-        for (const livelihood of formData.beneficiaryLivelihoods) {
+      if (livelihoodsToProcess && livelihoodsToProcess.length > 0) {
+        for (const livelihood of livelihoodsToProcess) {
           // Create beneficiary livelihood relationship
           const livelihoodResult = await beneficiaryLivelihoodsService.createBeneficiaryLivelihood({
-            beneficiary_id: beneficiaryDetailsId,
+            beneficiary_id: userId,
             livelihood_category_id: livelihood.livelihood_category_id
           });
 
@@ -1076,7 +1175,7 @@ export const rsbsaFormService = {
         const livelihoodCategoryId = formData.farmProfile.livelihood_category_id;
         if (livelihoodCategoryId) {
           const livelihoodResult = await beneficiaryLivelihoodsService.createBeneficiaryLivelihood({
-            beneficiary_id: beneficiaryDetailsId,
+            beneficiary_id: userId,
             livelihood_category_id: livelihoodCategoryId
           });
 
@@ -1271,14 +1370,17 @@ export const rsbsaFormService = {
   // Validate complete form data
   validateCompleteForm(formData) {
     console.log('🔍 Validating complete form data...');
+    console.log('📋 Form data structure:', formData);
     
     const errors = {};
     let hasErrors = false;
 
     // Validate beneficiary details
     if (formData.beneficiaryDetails) {
+      console.log('📋 Beneficiary details:', formData.beneficiaryDetails);
       const beneficiaryValidation = validateObject(formData.beneficiaryDetails, VALIDATION_SCHEMAS.beneficiaryDetails);
       if (beneficiaryValidation.hasErrors) {
+        console.error('❌ Beneficiary validation errors:', beneficiaryValidation.errors);
         errors.beneficiaryDetails = beneficiaryValidation.errors;
         hasErrors = true;
       }
@@ -1289,8 +1391,10 @@ export const rsbsaFormService = {
 
     // Validate farm profile
     if (formData.farmProfile) {
+      console.log('📋 Farm profile:', formData.farmProfile);
       const farmProfileValidation = validateObject(formData.farmProfile, VALIDATION_SCHEMAS.farmProfile);
       if (farmProfileValidation.hasErrors) {
+        console.error('❌ Farm profile validation errors:', farmProfileValidation.errors);
         errors.farmProfile = farmProfileValidation.errors;
         hasErrors = true;
       }
@@ -1301,10 +1405,12 @@ export const rsbsaFormService = {
 
     // Validate farm parcels
     if (formData.farmParcels && formData.farmParcels.length > 0) {
+      console.log('📋 Farm parcels:', formData.farmParcels);
       const parcelErrors = [];
       formData.farmParcels.forEach((parcel, index) => {
         const parcelValidation = validateObject(parcel, VALIDATION_SCHEMAS.farmParcel);
         if (parcelValidation.hasErrors) {
+          console.error(`❌ Parcel ${index} validation errors:`, parcelValidation.errors);
           parcelErrors[index] = parcelValidation.errors;
         }
       });

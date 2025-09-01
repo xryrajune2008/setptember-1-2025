@@ -22,6 +22,8 @@ export const useRSBSAForm = () => {
   // Form state based on database structure and API service
   const [formData, setFormData] = useState({
     // Beneficiary Details (matches actual database structure)
+    // Note: Name fields (first_name, last_name, etc.) are NOT included here
+    // because they come from the users table, not beneficiary_details table
     beneficiaryDetails: {
       id: null,
       user_id: null,
@@ -107,7 +109,7 @@ export const useRSBSAForm = () => {
     // NEW STRUCTURE: Beneficiary Livelihoods (many-to-many relationship)
     beneficiaryLivelihoods: [],
 
-    // Farmer Activities (matches farmer_activities table)
+    // Farmer Activities (matches farmer_activities table) - ALIGNED WITH DATABASE SCHEMA
     farmerActivities: {
       id: null,
       beneficiary_livelihood_id: null,
@@ -129,6 +131,7 @@ export const useRSBSAForm = () => {
       beneficiary_livelihood_id: null,
       fish_capture: false,
       aquaculture: false,
+      seaweed_farming: false,
       gleaning: false, // NEW ACTIVITY
       fish_processing: false,
       fish_vending: false, // NEW ACTIVITY
@@ -138,12 +141,12 @@ export const useRSBSAForm = () => {
       updated_at: null
     },
 
-    // Farmworker Activities (matches farmworker_activities table)
+    // Farmworker Activities (matches farmworker_activities table) - ALIGNED WITH DATABASE SCHEMA
     farmworkerActivities: {
       id: null,
       beneficiary_livelihood_id: null,
       land_preparation: false,
-      planting: false, // NEW ACTIVITY (separate from cultivation)
+      planting: false,
       cultivation: false,
       harvesting: false,
       others: false,
@@ -184,7 +187,7 @@ export const useRSBSAForm = () => {
 
   // Form step management
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 6;
+  const totalSteps = 5;
 
   // Load existing enrollment data from backend
   const loadExistingEnrollment = useCallback(async (userId) => {
@@ -200,7 +203,8 @@ export const useRSBSAForm = () => {
         setExistingEnrollment(result.data);
         
         // Populate form data with existing enrollment
-          setFormData(prevData => ({
+        setFormData(prevData => {
+          const updatedData = {
             ...prevData,
             beneficiaryDetails: { ...prevData.beneficiaryDetails, ...result.data.beneficiaryDetails },
             farmProfile: { ...prevData.farmProfile, ...result.data.farmProfile },
@@ -209,10 +213,22 @@ export const useRSBSAForm = () => {
             fisherfolkActivities: { ...prevData.fisherfolkActivities, ...result.data.livelihoodDetails },
             farmworkerActivities: { ...prevData.farmworkerActivities, ...result.data.livelihoodDetails },
             agriYouthActivities: { ...prevData.agriYouthActivities, ...result.data.livelihoodDetails }
-          }));
+          };
+
+          // Convert single livelihood to beneficiaryLivelihoods array for backward compatibility
+          if (result.data.farmProfile?.livelihood_category_id && !result.data.beneficiaryLivelihoods) {
+            updatedData.beneficiaryLivelihoods = [{
+              livelihood_category_id: result.data.farmProfile.livelihood_category_id
+            }];
+          } else if (result.data.beneficiaryLivelihoods) {
+            updatedData.beneficiaryLivelihoods = result.data.beneficiaryLivelihoods;
+          }
+
+          return updatedData;
+        });
 
         
-        localStorage.setItem('rsbsa_form_data', JSON.stringify(formData));
+        localStorage.setItem('rsbsa_form_data', JSON.stringify(result.data));
       } else {
         console.log('ℹ️ No existing enrollment found for user');
       }
@@ -222,7 +238,7 @@ export const useRSBSAForm = () => {
     } finally {
       setIsLoadingExistingData(false);
     }
-  }, [formData]);
+  }, []);
 
   // Load form data from localStorage on component mount
   useEffect(() => {
@@ -244,15 +260,80 @@ export const useRSBSAForm = () => {
     localStorage.setItem('rsbsa_form_data', JSON.stringify(formData));
   }, [formData]);
 
+  // Initialize beneficiary ID from localStorage on component mount
+  useEffect(() => {
+    try {
+      const beneficiaryId = localStorage.getItem('beneficiaryId');
+      const userStr = localStorage.getItem('user');
+      
+      console.log('🔍 useRSBSAForm: Initializing beneficiary ID...');
+      console.log('🔍 useRSBSAForm: beneficiaryId from localStorage:', beneficiaryId);
+      console.log('🔍 useRSBSAForm: userStr from localStorage:', userStr);
+      
+      if (beneficiaryId) {
+        console.log('✅ useRSBSAForm: Setting beneficiary ID from localStorage:', beneficiaryId);
+        setFormData(prevData => ({
+          ...prevData,
+          beneficiaryDetails: {
+            ...prevData.beneficiaryDetails,
+            id: beneficiaryId,
+            user_id: beneficiaryId
+          },
+          farmProfile: {
+            ...prevData.farmProfile,
+            beneficiary_id: beneficiaryId
+          }
+        }));
+      } else if (userStr) {
+        // If no beneficiary ID, try to get user ID and set it
+        const user = JSON.parse(userStr);
+        if (user.id) {
+          console.log('✅ useRSBSAForm: Setting user ID as beneficiary ID:', user.id);
+          setFormData(prevData => ({
+            ...prevData,
+            beneficiaryDetails: {
+              ...prevData.beneficiaryDetails,
+              user_id: user.id
+            },
+            farmProfile: {
+              ...prevData.farmProfile,
+              beneficiary_id: user.id
+            }
+          }));
+        }
+      }
+      
+      console.log('🔍 useRSBSAForm: Final formData state:', formData);
+    } catch (error) {
+      console.error('❌ useRSBSAForm: Error initializing beneficiary ID:', error);
+    }
+  }, []);
+
   // Update form field
   const updateField = useCallback((section, field, value) => {
-    setFormData(prevData => ({
-      ...prevData,
-      [section]: {
-        ...prevData[section],
-        [field]: value
+    setFormData(prevData => {
+      const updatedData = {
+        ...prevData,
+        [section]: {
+          ...prevData[section],
+          [field]: value
+        }
+      };
+
+      // Special handling for livelihood category updates
+      if (section === 'farmProfile' && field === 'livelihood_category_id') {
+        // Update beneficiaryLivelihoods array to maintain consistency
+        if (value) {
+          updatedData.beneficiaryLivelihoods = [{
+            livelihood_category_id: value
+          }];
+        } else {
+          updatedData.beneficiaryLivelihoods = [];
+        }
       }
-    }));
+
+      return updatedData;
+    });
 
     // Clear error for this field if it exists
     if (errors[`${section}.${field}`]) {
@@ -272,7 +353,7 @@ export const useRSBSAForm = () => {
       sector_id: null, // MISSING FIELD - required
       parcel_number: '',
       barangay: '',
-      farm_area: 0,
+      total_farm_area: 0, // Updated field name
       
       // Tenure / Ownership
       tenure_type: null, // enum: registered_owner, tenant, lessee
@@ -284,6 +365,9 @@ export const useRSBSAForm = () => {
       is_agrarian_reform_beneficiary: false,
       farm_type: null, // enum: irrigated, rainfed upland, rainfed lowland (note: space in enum)
       is_organic_practitioner: false,
+      
+      // CROP/COMMODITY Information - Now using commodities array
+      commodities: [], // Array of commodity objects
       
       remarks: '',
       created_at: null,
@@ -314,6 +398,48 @@ export const useRSBSAForm = () => {
     }));
   }, []);
 
+  // Helper function to validate livelihood activities
+  const validateLivelihoodActivities = useCallback((livelihoodCategoryId, formData, newErrors) => {
+    if (livelihoodCategoryId === 1) { // Farmer
+      const hasAnyFarmerActivity = 
+        formData.farmerActivities.rice || 
+        formData.farmerActivities.corn || 
+        formData.farmerActivities.other_crops ||
+        formData.farmerActivities.livestock ||
+        formData.farmerActivities.poultry;
+      
+      if (!hasAnyFarmerActivity) {
+        newErrors['farmerActivities'] = 'Please select at least one farming activity';
+      }
+    } else if (livelihoodCategoryId === 2) { // Fisherfolk
+      const hasAnyFishingActivity = 
+        formData.fisherfolkActivities.fish_capture || 
+        formData.fisherfolkActivities.aquaculture || 
+        formData.fisherfolkActivities.gleaning ||
+        formData.fisherfolkActivities.fish_processing ||
+        formData.fisherfolkActivities.fish_vending;
+      
+      if (!hasAnyFishingActivity) {
+        newErrors['fisherfolkActivities'] = 'Please select at least one fishing activity';
+      }
+    } else if (livelihoodCategoryId === 3) { // Farmworker
+      const hasAnyFarmworkerActivity = 
+        formData.farmworkerActivities.land_preparation || 
+        formData.farmworkerActivities.planting ||
+        formData.farmworkerActivities.cultivation || 
+        formData.farmworkerActivities.harvesting ||
+        formData.farmworkerActivities.others;
+      
+      if (!hasAnyFarmworkerActivity) {
+        newErrors['farmworkerActivities'] = 'Please select at least one farmworker activity';
+      }
+    } else if (livelihoodCategoryId === 4) { // Agri Youth
+      if (!formData.agriYouthActivities.is_agri_youth) {
+        newErrors['agriYouthActivities.is_agri_youth'] = 'Please confirm you are an Agri-Youth';
+      }
+    }
+  }, []);
+
   // Form validation with comprehensive error handling
   const validateForm = useCallback(() => {
     console.log('🔍 Validating form data...');
@@ -323,7 +449,9 @@ export const useRSBSAForm = () => {
       // Validate beneficiary details (updated for new structure)
       const { beneficiaryDetails } = formData;
       
-      // CRITICAL REQUIRED FIELDS
+      // Note: Name fields (first_name, last_name, etc.) are NOT required here
+      // because they come from the users table, not beneficiary_details table
+      // Core required fields as per backend validation
       if (!beneficiaryDetails.barangay?.trim()) {
         newErrors['beneficiaryDetails.barangay'] = 'Barangay is required';
       }
@@ -365,9 +493,44 @@ export const useRSBSAForm = () => {
           if (!parcel.tenure_type) {
             newErrors[`farmParcels.${index}.tenure_type`] = 'Tenure type is required';
           }
-          if (!parcel.farm_area || parcel.farm_area <= 0) {
-            newErrors[`farmParcels.${index}.farm_area`] = 'Farm area must be greater than 0';
-          }
+                     if (!parcel.total_farm_area || parcel.total_farm_area <= 0) {
+             newErrors[`farmParcels.${index}.total_farm_area`] = 'Total farm area must be greater than 0';
+           }
+           
+           // Validate commodities
+           if (!parcel.commodities || parcel.commodities.length === 0) {
+             newErrors[`farmParcels.${index}.commodities`] = 'At least one commodity is required';
+           } else {
+             // Validate each commodity
+             parcel.commodities.forEach((commodity, commodityIndex) => {
+               if (!commodity.commodity_type) {
+                 newErrors[`farmParcels.${index}.commodities.${commodityIndex}.commodity_type`] = 'Commodity type is required';
+               }
+               if (!commodity.size_hectares || commodity.size_hectares <= 0) {
+                 newErrors[`farmParcels.${index}.commodities.${commodityIndex}.size_hectares`] = 'Size must be greater than 0';
+               }
+               
+               // Validate livestock-specific fields
+               if (commodity.commodity_type === 'livestock') {
+                 if (!commodity.animal_type?.trim()) {
+                   newErrors[`farmParcels.${index}.commodities.${commodityIndex}.animal_type`] = 'Type of animal is required for livestock';
+                 }
+                 if (!commodity.number_of_heads || commodity.number_of_heads <= 0) {
+                   newErrors[`farmParcels.${index}.commodities.${commodityIndex}.number_of_heads`] = 'Number of heads must be greater than 0 for livestock';
+                 }
+               }
+               
+               // Validate poultry-specific fields
+               if (commodity.commodity_type === 'poultry') {
+                 if (!commodity.animal_type?.trim()) {
+                   newErrors[`farmParcels.${index}.commodities.${commodityIndex}.animal_type`] = 'Type of animal is required for poultry';
+                 }
+                 if (!commodity.number_of_heads || commodity.number_of_heads <= 0) {
+                   newErrors[`farmParcels.${index}.commodities.${commodityIndex}.number_of_heads`] = 'Number of heads must be greater than 0 for poultry';
+                 }
+               }
+             });
+           }
         });
       }
 
@@ -375,49 +538,19 @@ export const useRSBSAForm = () => {
       // Note: With new structure, we need to validate based on selected livelihoods
       if (formData.beneficiaryLivelihoods && formData.beneficiaryLivelihoods.length > 0) {
         formData.beneficiaryLivelihoods.forEach((livelihood, index) => {
-          if (livelihood.livelihood_category_id === 1) { // Farmer
-            const hasAnyFarmerActivity = 
-              formData.farmerActivities.rice || 
-              formData.farmerActivities.corn || 
-              formData.farmerActivities.other_crops ||
-              formData.farmerActivities.livestock ||
-              formData.farmerActivities.poultry;
-            
-            if (!hasAnyFarmerActivity) {
-              newErrors['farmerActivities'] = 'Please select at least one farming activity';
-            }
-          } else if (livelihood.livelihood_category_id === 2) { // Fisherfolk
-            const hasAnyFishingActivity = 
-              formData.fisherfolkActivities.fish_capture || 
-              formData.fisherfolkActivities.aquaculture || 
-              formData.fisherfolkActivities.gleaning ||
-              formData.fisherfolkActivities.fish_processing ||
-              formData.fisherfolkActivities.fish_vending;
-            
-            if (!hasAnyFishingActivity) {
-              newErrors['fisherfolkActivities'] = 'Please select at least one fishing activity';
-            }
-          } else if (livelihood.livelihood_category_id === 3) { // Farmworker
-            const hasAnyFarmworkerActivity = 
-              formData.farmworkerActivities.land_preparation || 
-              formData.farmworkerActivities.planting ||
-              formData.farmworkerActivities.cultivation || 
-              formData.farmworkerActivities.harvesting;
-            
-            if (!hasAnyFarmworkerActivity) {
-              newErrors['farmworkerActivities'] = 'Please select at least one farmworker activity';
-            }
-          } else if (livelihood.livelihood_category_id === 4) { // Agri Youth
-            if (!formData.agriYouthActivities.is_agri_youth) {
-              newErrors['agriYouthActivities.is_agri_youth'] = 'Please confirm you are an Agri-Youth';
-            }
-          }
+          validateLivelihoodActivities(livelihood.livelihood_category_id, formData, newErrors);
         });
       } else {
         // Fallback validation for single livelihood (backward compatibility)
+        // Only show error if no livelihood category is selected at all
         const livelihoodCategoryId = formData.farmProfile.livelihood_category_id;
-        if (livelihoodCategoryId) {
-          newErrors['beneficiaryLivelihoods'] = 'Please select at least one livelihood category';
+        
+        if (!livelihoodCategoryId) {
+          newErrors['farmProfile.livelihood_category_id'] = 'Please select a livelihood category';
+        } else {
+          // If livelihood category is selected but no beneficiaryLivelihoods array,
+          // validate the activities based on the selected category
+          validateLivelihoodActivities(livelihoodCategoryId, formData, newErrors);
         }
       }
 
@@ -589,49 +722,62 @@ export const useRSBSAForm = () => {
         updated_at: null
       },
       farmParcels: [],
-      farmerDetails: {
+      // NEW STRUCTURE: Beneficiary Livelihoods (many-to-many relationship)
+      beneficiaryLivelihoods: [],
+      // Farmer Activities (matches farmer_activities table) - ALIGNED WITH DATABASE SCHEMA
+      farmerActivities: {
         id: null,
-        farm_profile_id: null,
-        is_rice: false,
-        is_corn: false,
-        is_other_crops: false,
-        other_crops_description: '',
-        is_livestock: false,
-        livestock_description: '',
-        is_poultry: false,
-        poultry_description: '',
+        beneficiary_livelihood_id: null,
+        rice: false,
+        corn: false,
+        other_crops: false,
+        other_crops_specify: '',
+        livestock: false,
+        livestock_specify: '',
+        poultry: false,
+        poultry_specify: '',
         created_at: null,
         updated_at: null
       },
-      fisherfolkDetails: {
+      // Fisherfolk Activities (matches fisherfolk_activities table)
+      fisherfolkActivities: {
         id: null,
-        farm_profile_id: null,
-        is_fish_capture: false,
-        is_aquaculture: false,
-        is_fish_processing: false,
-        other_fishing_description: '',
+        beneficiary_livelihood_id: null,
+        fish_capture: false,
+        aquaculture: false,
+        seaweed_farming: false,
+        gleaning: false, // NEW ACTIVITY
+        fish_processing: false,
+        fish_vending: false, // NEW ACTIVITY
+        others: false,
+        others_specify: '',
         created_at: null,
         updated_at: null
       },
-      farmworkerDetails: {
+      // Farmworker Activities (matches farmworker_activities table) - ALIGNED WITH DATABASE SCHEMA
+      farmworkerActivities: {
         id: null,
-        farm_profile_id: null,
-        is_land_preparation: false,
-        is_cultivation: false,
-        is_harvesting: false,
-        other_work_description: '',
+        beneficiary_livelihood_id: null,
+        land_preparation: false,
+        planting: false,
+        cultivation: false,
+        harvesting: false,
+        others: false,
+        others_specify: '',
         created_at: null,
         updated_at: null
       },
-      agriYouthDetails: {
+      // Agri Youth Activities (matches proposed agri_youth_activities table)
+      agriYouthActivities: {
         id: null,
-        farm_profile_id: null,
+        beneficiary_livelihood_id: null,
         is_agri_youth: false,
         is_part_of_farming_household: false,
         is_formal_agri_course: false,
         is_nonformal_agri_course: false,
         is_agri_program_participant: false,
-        other_involvement_description: '',
+        others: false,
+        others_specify: '',
         created_at: null,
         updated_at: null
       }
@@ -671,11 +817,11 @@ export const useRSBSAForm = () => {
     // Check farm parcels completion
     if (formData.farmParcels.length > 0) {
       completedFields++;
-      // Check if first parcel is properly filled
-      const firstParcel = formData.farmParcels[0];
-      if (firstParcel && firstParcel.barangay && firstParcel.tenure_type && firstParcel.farm_area > 0) {
-        completedFields += 3;
-      }
+             // Check if first parcel is properly filled
+       const firstParcel = formData.farmParcels[0];
+       if (firstParcel && firstParcel.barangay && firstParcel.tenure_type && firstParcel.total_farm_area > 0) {
+         completedFields += 3;
+       }
     }
 
     // Check livelihood-specific completion based on NEW STRUCTURE
@@ -695,18 +841,20 @@ export const useRSBSAForm = () => {
                          formData.fisherfolkActivities?.fish_processing ||
                          formData.fisherfolkActivities?.fish_vending;
       if (hasActivity) completedFields++;
-    } else if (livelihoodCategoryId === 3) { // Farmworker
-      const hasActivity = formData.farmworkerActivities?.land_preparation || 
-                         formData.farmworkerActivities?.planting ||
-                         formData.farmworkerActivities?.cultivation || 
-                         formData.farmworkerActivities?.harvesting;
-      if (hasActivity) completedFields++;
+         } else if (livelihoodCategoryId === 3) { // Farmworker
+       const hasActivity = formData.farmworkerActivities?.land_preparation || 
+                          formData.farmworkerActivities?.planting ||
+                          formData.farmworkerActivities?.cultivation || 
+                          formData.farmworkerActivities?.harvesting ||
+                          formData.farmworkerActivities?.others;
+       if (hasActivity) completedFields++;
     } else if (livelihoodCategoryId === 4) { // Agri Youth
       if (formData.agriYouthActivities?.is_agri_youth) completedFields++;
     }
 
-    // Check beneficiary livelihoods (new structure)
-    if (formData.beneficiaryLivelihoods && formData.beneficiaryLivelihoods.length > 0) {
+    // Check beneficiary livelihoods (new structure) or single livelihood (backward compatibility)
+    if ((formData.beneficiaryLivelihoods && formData.beneficiaryLivelihoods.length > 0) || 
+        formData.farmProfile.livelihood_category_id) {
       completedFields++;
     }
 
@@ -737,6 +885,7 @@ export const useRSBSAForm = () => {
     updateFarmParcel,
     removeFarmParcel,
     validateForm,
+    validateLivelihoodActivities,
     nextStep,
     prevStep,
     goToStep,
@@ -748,7 +897,10 @@ export const useRSBSAForm = () => {
     // Computed values
     formProgress: getFormProgress(),
     isValid: Object.keys(errors).length === 0 && Object.keys(backendErrors).length === 0,
-    canSubmit: Object.keys(errors).length === 0 && formData.farmParcels.length > 0 && !isSubmitting,
+    canSubmit: Object.keys(errors).length === 0 && 
+               formData.farmParcels.length > 0 && 
+               formData.farmProfile.livelihood_category_id && 
+               !isSubmitting,
     hasBackendErrors: Object.keys(backendErrors).length > 0
   };
 };

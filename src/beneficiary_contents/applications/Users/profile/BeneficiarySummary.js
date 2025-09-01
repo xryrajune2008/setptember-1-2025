@@ -56,7 +56,7 @@ function BeneficiarySummary() {
     total_applications: 3,
     approved_applications: 2,
     pending_applications: 1,
-    farm_area: '2.5 hectares',
+            total_farm_area: '2.5 hectares',
     primary_crop: 'Rice',
     location: 'Opol, Misamis Oriental',
     member_since: '2024-01-15',
@@ -194,7 +194,7 @@ function BeneficiarySummary() {
                 Farm Area:
               </Typography>
               <Typography variant="body2" fontWeight="medium">
-                {beneficiaryData.farm_area}
+                {beneficiaryData.total_farm_area}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>

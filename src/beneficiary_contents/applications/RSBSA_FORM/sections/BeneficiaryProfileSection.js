@@ -14,7 +14,8 @@ import {
   CardContent,
   Divider,
   FormHelperText,
-  Chip
+  Chip,
+  Alert
 } from '@mui/material';
 import { Person as PersonIcon } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -22,12 +23,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
-  // Ensure defaults
+  // Ensure defaults - Note: Name fields come from users table, not here
   const beneficiaryDetails = {
-    first_name: '',
-    last_name: '',
-    middle_name: '',
-    extension_name: '', // ✅ Added here
     contact_number: '',
     emergency_contact_number: '',
     birth_date: '',
@@ -78,14 +75,7 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
     { value: 'no', label: 'No' }
   ];
 
-  const extensionOptions = [
-    { value: '', label: 'None' },
-    { value: 'Jr.', label: 'Jr.' },
-    { value: 'Sr.', label: 'Sr.' },
-    { value: 'II', label: 'II' },
-    { value: 'III', label: 'III' },
-    { value: 'IV', label: 'IV' }
-  ];
+
 
   const barangayOptions = [
     'Bagocboc', 'Barra', 'Bonbon', 'Buruanga', 'Cabadiangan', 'Camaman-an',
@@ -141,60 +131,14 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
               <Divider sx={{ mb: 3 }} />
 
               <Grid container spacing={3}>
-                {/* First Name */}
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    fullWidth
-                    autoFocus
-                    label="First Name *"
-                    value={beneficiaryDetails.first_name}
-                    onChange={(e) => handleFieldChange('first_name', e.target.value)}
-                    error={!!errors['beneficiaryProfile.first_name']}
-                    helperText={errors['beneficiaryProfile.first_name']}
-                    placeholder="Enter your first name"
-                  />
-                </Grid>
-
-                {/* Middle Name */}
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    fullWidth
-                    label="Middle Name"
-                    value={beneficiaryDetails.middle_name}
-                    onChange={(e) => handleFieldChange('middle_name', e.target.value)}
-                    placeholder="Enter your middle name (optional)"
-                  />
-                </Grid>
-
-                {/* Last Name */}
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    fullWidth
-                    label="Last Name *"
-                    value={beneficiaryDetails.last_name}
-                    onChange={(e) => handleFieldChange('last_name', e.target.value)}
-                    error={!!errors['beneficiaryProfile.last_name']}
-                    helperText={errors['beneficiaryProfile.last_name']}
-                    placeholder="Enter your last name"
-                  />
-                </Grid>
-
-                {/* Extension Name (dropdown) */}
-                <Grid item xs={12} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel>Extension</InputLabel>
-                    <Select
-                      value={beneficiaryDetails.extension_name}
-                      onChange={(e) => handleFieldChange('extension_name', e.target.value)}
-                      label="Extension"
-                    >
-                      {extensionOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                {/* User Name Display (Read-only from users table) */}
+                <Grid item xs={12}>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Name Information:</strong> Your name is already registered in your account. 
+                      If you need to update your name, please contact the administrator.
+                    </Typography>
+                  </Alert>
                 </Grid>
 
                 {/* Contact Number */}
@@ -204,8 +148,8 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                     label="Contact Number *"
                     value={beneficiaryDetails.contact_number}
                     onChange={(e) => handleFieldChange('contact_number', e.target.value)}
-                    error={!!errors['beneficiaryProfile.contact_number']}
-                    helperText={errors['beneficiaryProfile.contact_number'] || 'Format: 09XXXXXXXXX'}
+                                      error={!!errors['beneficiaryDetails.contact_number']}
+                  helperText={errors['beneficiaryDetails.contact_number'] || 'Format: 09XXXXXXXXX'}
                     placeholder="09XXXXXXXXX"
                   />
                 </Grid>
@@ -217,6 +161,8 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                     label="Emergency Contact Number"
                     value={beneficiaryDetails.emergency_contact_number}
                     onChange={(e) => handleFieldChange('emergency_contact_number', e.target.value)}
+                    error={!!errors['beneficiaryDetails.emergency_contact_number']}
+                    helperText={errors['beneficiaryDetails.emergency_contact_number'] || 'Format: 09XXXXXXXXX'}
                     placeholder="09XXXXXXXXX"
                   />
                 </Grid>
@@ -226,20 +172,32 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                   <LocalizationProvider dateAdapter={AdapterDateFns}>
                     <DatePicker
                       label="Birth Date *"
-                      value={beneficiaryDetails.birth_date ? new Date(beneficiaryDetails.birth_date) : null}
-                      onChange={(date) =>
-                        handleFieldChange(
-                          'birth_date',
-                          date ? date.toISOString().split('T')[0] : ''
-                        )
-                      }
+                      value={beneficiaryDetails.birth_date ? (() => {
+                        const date = new Date(beneficiaryDetails.birth_date);
+                        return !Number.isNaN(date.getTime()) ? date : null;
+                      })() : null}
+                      onChange={(date) => {
+                        // Handle date change with proper validation
+                        if (date && !Number.isNaN(date.getTime())) {
+                          // Valid date - convert to YYYY-MM-DD format
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const formattedDate = `${year}-${month}-${day}`;
+                          handleFieldChange('birth_date', formattedDate);
+                        } else if (date === null) {
+                          // Date cleared
+                          handleFieldChange('birth_date', '');
+                        }
+                        // Invalid date - do nothing (don't update the field)
+                      }}
                       maxDate={new Date()} // 🚀 Prevent future dates
                       renderInput={(params) => (
                         <TextField
                           {...params}
                           fullWidth
-                          error={!!errors['beneficiaryProfile.birth_date']}
-                          helperText={errors['beneficiaryProfile.birth_date']}
+                          error={!!errors['beneficiaryDetails.birth_date']}
+                          helperText={errors['beneficiaryDetails.birth_date'] || 'Format: YYYY-MM-DD'}
                         />
                       )}
                     />
@@ -248,7 +206,7 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
 
                 {/* Sex */}
                 <Grid item xs={12} md={4}>
-                  <FormControl fullWidth error={!!errors['beneficiaryProfile.sex']}>
+                  <FormControl fullWidth error={!!errors['beneficiaryDetails.sex']}>
                     <InputLabel>Sex *</InputLabel>
                     <Select
                       value={beneficiaryDetails.sex}
@@ -258,8 +216,8 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                       <MenuItem value="male">Male</MenuItem>
                       <MenuItem value="female">Female</MenuItem>
                     </Select>
-                    {errors['beneficiaryProfile.sex'] && (
-                      <FormHelperText>{errors['beneficiaryProfile.sex']}</FormHelperText>
+                    {errors['beneficiaryDetails.sex'] && (
+                      <FormHelperText>{errors['beneficiaryDetails.sex']}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>
@@ -271,13 +229,15 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                     label="Place of Birth"
                     value={beneficiaryDetails.place_of_birth}
                     onChange={(e) => handleFieldChange('place_of_birth', e.target.value)}
+                    error={!!errors['beneficiaryDetails.place_of_birth']}
+                    helperText={errors['beneficiaryDetails.place_of_birth'] || 'City, Province'}
                     placeholder="City, Province"
                   />
                 </Grid>
 
                 {/* Barangay */}
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth error={!!errors['beneficiaryProfile.barangay']}>
+                  <FormControl fullWidth error={!!errors['beneficiaryDetails.barangay']}>
                     <InputLabel>Barangay *</InputLabel>
                     <Select
                       value={beneficiaryDetails.barangay}
@@ -290,8 +250,8 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                         </MenuItem>
                       ))}
                     </Select>
-                    {errors['beneficiaryProfile.barangay'] && (
-                      <FormHelperText>{errors['beneficiaryProfile.barangay']}</FormHelperText>
+                    {errors['beneficiaryDetails.barangay'] && (
+                      <FormHelperText>{errors['beneficiaryDetails.barangay']}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>
@@ -318,7 +278,7 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
 
                 {/* Civil Status */}
                 <Grid item xs={12} md={6}>
-                  <FormControl fullWidth error={!!errors['beneficiaryProfile.civil_status']}>
+                  <FormControl fullWidth error={!!errors['beneficiaryDetails.civil_status']}>
                     <InputLabel>Civil Status *</InputLabel>
                     <Select
                       value={beneficiaryDetails.civil_status}
@@ -331,8 +291,8 @@ const BeneficiaryProfileSection = ({ formData, errors, updateField }) => {
                         </MenuItem>
                       ))}
                     </Select>
-                    {errors['beneficiaryProfile.civil_status'] && (
-                      <FormHelperText>{errors['beneficiaryProfile.civil_status']}</FormHelperText>
+                    {errors['beneficiaryDetails.civil_status'] && (
+                      <FormHelperText>{errors['beneficiaryDetails.civil_status']}</FormHelperText>
                     )}
                   </FormControl>
                 </Grid>

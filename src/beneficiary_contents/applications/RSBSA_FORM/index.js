@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Container,
@@ -34,6 +34,7 @@ import { styled } from '@mui/material/styles';
 
 // Import the custom hook
 import { useRSBSAForm } from './useRSBSAForm';
+import useBeneficiaryData from '../../../hooks-auth/hooks-auth-beneficiary/useBeneficiaryData';
 
 // Import form sections
 import BeneficiaryProfileSection from './sections/BeneficiaryProfileSection';
@@ -96,8 +97,46 @@ const ActionButtonContainer = styled(Box)(({ theme }) => ({
 }));
 
 const RSBSAForm = () => {
-  // Get user ID from context or props (this should be provided by your auth system)
-  const userId = 1; // Replace with actual user ID from authentication context
+  // Get beneficiary data using the hook
+  const { beneficiaryId, getBeneficiaryId, hasBeneficiaryData } = useBeneficiaryData();
+  
+  // Get user ID from localStorage (authenticated user)
+  const storedUser = JSON.parse(localStorage.getItem('user')) || {};
+  const userId = storedUser.id || storedUser.user_id;
+  
+  // Get beneficiary ID with fallback to user ID (for display only)
+  const effectiveBeneficiaryId = beneficiaryId || getBeneficiaryId() || userId;
+  
+  console.log('🔍 Authenticated user:', storedUser);
+  console.log('🔍 User ID:', userId);
+  console.log('🔍 Beneficiary ID from hook:', beneficiaryId);
+  console.log('🔍 Effective Beneficiary ID:', effectiveBeneficiaryId);
+  
+  // Check if user is authenticated
+  if (!userId) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6" color="error">
+          You must be logged in to access the RSBSA form. Please log in and try again.
+        </Typography>
+      </Box>
+    );
+  }
+  
+  // Debug information (can be removed in production)
+  const debugInfo = {
+    userId,
+    beneficiaryId,
+    effectiveBeneficiaryId,
+    hasBeneficiaryData: hasBeneficiaryData(),
+    localStorage: {
+      user: localStorage.getItem('user'),
+      beneficiaryId: localStorage.getItem('beneficiaryId'),
+      beneficiaryDetails: localStorage.getItem('beneficiaryDetails')
+    }
+  };
+  
+  console.log('🔍 RSBSA Form Debug Info:', debugInfo);
   
   const {
     formData,
@@ -123,6 +162,14 @@ const RSBSAForm = () => {
     canSubmit,
     hasBackendErrors
   } = useRSBSAForm();
+  
+  // Load existing enrollment data when component mounts (uses userId as backend expects)
+  useEffect(() => {
+    if (userId) {
+      console.log('🔄 Loading existing enrollment data for user:', userId);
+      loadExistingEnrollment(userId);
+    }
+  }, [userId, loadExistingEnrollment]);
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [showError, setShowError] = useState(false);
@@ -131,6 +178,7 @@ const RSBSAForm = () => {
   // ✅ Single handleSubmit
   const handleSubmit = async () => {
     try {
+      console.log('🚀 Submitting form with user ID:', userId);
       const result = await submitForm(userId);
       if (result.success) {
         setShowSuccess(true);
@@ -149,6 +197,7 @@ const RSBSAForm = () => {
   // ✅ Single handleSaveDraft
   const handleSaveDraft = async () => {
     try {
+      console.log('💾 Saving draft with user ID:', userId);
       const result = await saveDraft(userId);
       if (result.success) {
         console.log('✅ Draft saved successfully');
@@ -205,19 +254,16 @@ const RSBSAForm = () => {
       case 1:
         return (
           <BeneficiaryProfileSection
-            formData={formData.beneficiaryProfile}
+            formData={formData.beneficiaryDetails}
             errors={errors}
-            updateField={(field, value) => updateField('beneficiaryProfile', field, value)}
+            onEdit={goToStep}
+            updateField={(field, value) => updateField('beneficiaryDetails', field, value)}
           />
         );
       case 2:
         return (
           <FarmProfileSection
-            formData={formData.farmProfile}
-            farmerDetails={formData.farmerDetails}
-            fisherfolkDetails={formData.fisherfolkDetails}
-            farmworkerDetails={formData.farmworkerDetails}
-            agriYouthDetails={formData.agriYouthDetails}
+            formData={formData}
             errors={errors}
             updateField={updateField}
           />
@@ -246,7 +292,8 @@ const RSBSAForm = () => {
             formData={formData}
             isSubmitting={isSubmitting}
             onSubmit={handleSubmit}
-            canSubmit={canSubmit}
+            onSaveDraft={handleSaveDraft}
+            onReset={handleReset}
           />
         );
       default:
@@ -257,27 +304,13 @@ const RSBSAForm = () => {
   return (
     <>
       <Helmet>
-        <title>RSBSA Registration Form - Registry System for Basic Sectors in Agriculture</title>
-        <meta 
-          name="description" 
-          content="Complete your RSBSA registration to access agricultural programs and benefits" 
-        />
+        <title>RSBSA Enrollment</title>
       </Helmet>
-
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Header Section */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 4, 
-            mb: 4, 
-            background: 'linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)',
-            color: 'white',
-            borderRadius: 2
-          }}
-        >
-          <Typography variant="h3" component="h1" gutterBottom fontWeight="bold">
-            RSBSA Registration Form
+      <Container maxWidth="lg">
+        {/* Header */}
+        <Paper elevation={0} sx={{ p: 3, mb: 3, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="h3" fontWeight="bold" gutterBottom>
+            RSBSA Enrollment
           </Typography>
           <Typography variant="h6" sx={{ opacity: 0.9, mb: 2 }}>
             Registry System for Basic Sectors in Agriculture
@@ -287,6 +320,16 @@ const RSBSAForm = () => {
             services, and benefits provided by the Department of Agriculture.
           </Typography>
         </Paper>
+
+        {/* Debug Information (can be removed in production) */}
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+          <Typography variant="body2" gutterBottom>
+            <strong>Debug Info:</strong> User ID: {userId} | Beneficiary ID: {beneficiaryId || 'Not set'} | Effective ID: {effectiveBeneficiaryId}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            If Beneficiary ID shows "Not set", the login process may not have completed properly.
+          </Typography>
+        </Alert>
 
         {/* Progress Indicator */}
         <ProgressContainer>
@@ -317,30 +360,6 @@ const RSBSAForm = () => {
             Step {currentStep} of {totalSteps}: {steps[currentStep - 1]?.description}
           </Typography>
         </ProgressContainer>
-
-        {/* Success/Error Messages */}
-        <Fade in={showSuccess}>
-          <Alert 
-            severity="success" 
-            sx={{ mb: 3, borderRadius: 2 }}
-            onClose={() => setShowSuccess(false)}
-          >
-            <Typography variant="h6" gutterBottom>Form Submitted Successfully!</Typography>
-            Your RSBSA application has been submitted and is now being processed. 
-            You will receive updates on your application status.
-          </Alert>
-        </Fade>
-
-        <Fade in={showError}>
-          <Alert 
-            severity="error" 
-            sx={{ mb: 3, borderRadius: 2 }}
-            onClose={() => setShowError(false)}
-          >
-            <Typography variant="h6" gutterBottom>Submission Failed</Typography>
-            {errorMessage}
-          </Alert>
-        </Fade>
 
         {/* Main Form Card */}
         <StyledCard>
@@ -380,20 +399,7 @@ const RSBSAForm = () => {
                     Save Draft
                   </Button>
                 </Tooltip>
-
-                <Tooltip title="Reset all form data">
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<RefreshIcon />}
-                    onClick={handleReset}
-                    disabled={isSubmitting}
-                  >
-                    Reset Form
-                  </Button>
-                </Tooltip>
               </Box>
-
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button
                   variant="outlined"
@@ -401,69 +407,32 @@ const RSBSAForm = () => {
                   onClick={prevStep}
                   disabled={currentStep === 1 || isSubmitting}
                 >
-                  Previous
+                  Back
                 </Button>
-
                 {currentStep < totalSteps ? (
                   <Button
                     variant="contained"
                     endIcon={<ArrowForwardIcon />}
                     onClick={nextStep}
                     disabled={isSubmitting}
-                    sx={{ minWidth: 120 }}
                   >
-                    Next
+                    Continue
                   </Button>
                 ) : (
                   <Button
                     variant="contained"
-                    color="success"
+                    color="primary"
                     endIcon={<SendIcon />}
                     onClick={handleSubmit}
-                    disabled={!canSubmit || isSubmitting}
-                    sx={{ minWidth: 120 }}
+                    disabled={isSubmitting || !canSubmit}
                   >
-                    {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                    Submit Application
                   </Button>
                 )}
               </Box>
             </ActionButtonContainer>
           </CardContent>
         </StyledCard>
-
-        {/* Form Information Footer */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            mt: 4, 
-            p: 3, 
-            backgroundColor: 'background.default',
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'divider'
-          }}
-        >
-          <Typography variant="h6" gutterBottom color="primary">
-            Important Information
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Data Privacy:</strong> Your information is protected under the Data Privacy Act of 2012.
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Auto-Save:</strong> Your progress is automatically saved as you complete each section.
-              </Typography>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="body2" color="text.secondary">
-                <strong>Support:</strong> Contact your local DA office for assistance with this form.
-              </Typography>
-            </Grid>
-          </Grid>
-        </Paper>
       </Container>
     </>
   );
