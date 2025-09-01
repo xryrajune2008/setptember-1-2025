@@ -1220,18 +1220,16 @@ export const rsbsaFormService = {
       }
 
       // Step 5: Create RSBSA enrollment
-      const enrollmentData = {
+      const enrollmentResult = await rsbsaEnrollmentService.createEnrollment({
         user_id: userId,
         beneficiary_details_id: beneficiaryDetailsId,
         farm_profile_id: farmProfileId,
-        application_reference_code: 'RSBSA-' + Date.now(),
+        application_reference_code: `RSBSA-${Date.now()}`,
         enrollment_year: new Date().getFullYear(),
         enrollment_type: 'new',
         application_status: 'submitted',
         submitted_at: new Date().toISOString()
-      };
-      
-      const enrollmentResult = await rsbsaEnrollmentService.createEnrollment(enrollmentData);
+      });
 
       if (!enrollmentResult.success) {
         return enrollmentResult;
