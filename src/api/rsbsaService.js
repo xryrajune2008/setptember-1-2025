@@ -1126,7 +1126,7 @@ export const rsbsaFormService = {
         for (const livelihood of livelihoodsToProcess) {
           // Create beneficiary livelihood relationship
           const livelihoodResult = await beneficiaryLivelihoodsService.createBeneficiaryLivelihood({
-            beneficiary_id: userId,
+            user_id: userId, // Changed from beneficiary_id to user_id to match migration
             livelihood_category_id: livelihood.livelihood_category_id
           });
 
@@ -1175,7 +1175,7 @@ export const rsbsaFormService = {
         const livelihoodCategoryId = formData.farmProfile.livelihood_category_id;
         if (livelihoodCategoryId) {
           const livelihoodResult = await beneficiaryLivelihoodsService.createBeneficiaryLivelihood({
-            beneficiary_id: userId,
+            user_id: userId, // Changed from beneficiary_id to user_id to match migration
             livelihood_category_id: livelihoodCategoryId
           });
 
