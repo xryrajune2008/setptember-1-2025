@@ -571,15 +571,15 @@ export const beneficiaryLivelihoodsService = {
     }
   },
 
-  // Get beneficiary livelihoods by beneficiary ID
-  async getBeneficiaryLivelihoods(beneficiaryId) {
+  // Get beneficiary livelihoods by user ID
+  async getBeneficiaryLivelihoods(userId) {
     try {
-      console.log('🔍 Fetching beneficiary livelihoods for beneficiary:', beneficiaryId);
-      const response = await axiosInstance.get(`${RSBSA_ENDPOINTS.BENEFICIARY_LIVELIHOODS}/beneficiary/${beneficiaryId}`);
+      console.log('🔍 Fetching beneficiary livelihoods for user:', userId);
+      const response = await axiosInstance.get(`${RSBSA_ENDPOINTS.BENEFICIARY_LIVELIHOODS}/user/${userId}`);
       console.log('✅ Beneficiary livelihoods fetched successfully:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
-      logError('Get Beneficiary Livelihoods', error, { beneficiaryId });
+      logError('Get Beneficiary Livelihoods', error, { userId });
       return { 
         success: false, 
         error: error.response?.data?.message || 'Failed to fetch beneficiary livelihoods',
